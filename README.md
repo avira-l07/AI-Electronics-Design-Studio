@@ -23,3 +23,24 @@ Run `node tests/calculations.cjs` from this directory. Numerical checks cover fu
 ## Mechanics assumptions
 
 Ideal rigid slider-crank with zero offset, no friction, loading, deformation or clearances. Stroke = 2r; full rotation requires L > r. Displacement from outer dead center is `r(1-cos θ) + L - sqrt(L²-r² sin² θ)`. Playback is deliberately slowed and independent of the operating RPM used in calculations. Generated SVGs are conceptual illustrations.
+
+## Product pages (v0.3)
+
+The default route is the landing page. Routes use URL fragments so direct links work on static hosting:
+
+- `#/landing` — product introduction and capability overview
+- `#/signup` — device-local preview profile creation
+- `#/login` — local profile email matching, explicitly not secure authentication
+- `#/dashboard` — project search, project summaries, and workspace entry
+- `#/profile` — editable local profile and session controls
+- `#/pricing` — free plan and unpriced premium placeholder
+- `#/upgrade` — premium upgrade overview
+- `#/checkout` — no-charge simulation without payment fields
+- `#/confirmation` — demo receipt and premium-preview navigation
+- `#/billing` — free-plan status and demo receipt history
+- `#/premium` — premium dashboard preview with undefined feature areas
+- `#/workspace` — existing engineering workspace
+
+No password, card, bank or UPI data is collected. The local profile is not an authentication or authorization boundary. Demo orders never grant paid entitlements; all financial screens label records as simulations. The existing owner-private Sites access policy is preserved. Live accounts, payment collection, webhooks, subscription lifecycle and server-side entitlements require a production backend and payment provider, confirmed prices, and the user's premium feature definitions.
+
+Browser validation covers profile create/edit, email mismatch feedback, session exit/resume, billing period selection, demo checkout/confirmation/history, premium navigation, project search/entry, and phone/desktop layouts.
