@@ -44,3 +44,11 @@ The default route is the landing page. Routes use URL fragments so direct links 
 No password, card, bank or UPI data is collected. The local profile is not an authentication or authorization boundary. Demo orders never grant paid entitlements; all financial screens label records as simulations. The existing owner-private Sites access policy is preserved. Live accounts, payment collection, webhooks, subscription lifecycle and server-side entitlements require a production backend and payment provider, confirmed prices, and the user's premium feature definitions.
 
 Browser validation covers profile create/edit, email mismatch feedback, session exit/resume, billing period selection, demo checkout/confirmation/history, premium navigation, project search/entry, and phone/desktop layouts.
+
+## Secure server implementation (v0.4)
+
+See [api/REFINED_BRIEF.md](api/REFINED_BRIEF.md), [api/README.md](api/README.md), and [api/SECURITY_REVIEW.md](api/SECURITY_REVIEW.md).
+
+The same frontend now supports a same-origin FastAPI API with Argon2id passwords, verified accounts, revocable sessions, TOTP/Google adapters, account-owned profiles and projects, Stripe-hosted checkout, signature-verified/idempotent webhooks, billing history, security settings, notifications, data export/deletion and admin APIs/UI. The PostgreSQL migration and dependency lock are in `api/`.
+
+Static Sites hosting still serves the explicitly labeled account/payment preview. It does not run Python, provision PostgreSQL, deliver email or process payments. Serve the frontend through the API (or a same-origin reverse proxy) to activate server mode. Paid billing defaults off. The release checklist distinguishes tested code from provider and production validation still required.
