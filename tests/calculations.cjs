@@ -1,0 +1,30 @@
+const fs = require('node:fs');
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+const fakeNode = {onclick:null,textContent:'',classList:{add(){},remove(){}},style:{}};
+const context = vm.createContext({document:{querySelector:()=>fakeNode,addEventListener(){}},localStorage:{getItem:()=>null},structuredClone,console});
+const base=fs.readFileSync('dist/app.js','utf8').replace(/render\(\);\s*$/,'');
+vm.runInContext(base,context);
+vm.runInContext(fs.readFileSync('dist/advanced.js','utf8').split('render=function()')[0],context);
+const run=code=>vm.runInContext(code,context);
+assert.equal(run('kinematics(80,150,0,600).x'),0);
+assert.equal(run('kinematics(80,150,180,600).x'),80);
+assert.equal(run('kinematics(80,150,360,600).x'),0);
+assert.equal(run('kinematics(80,30,90,600).valid'),false);
+for(let angle=5;angle<360;angle+=5){
+  const actual=run(`kinematics(80,150,${angle},600).velocity`);
+  const derivative=run(`(kinematics(80,150,${angle+.001},600).x-kinematics(80,150,${angle-.001},600).x)/(.002*Math.PI/180)*(600*2*Math.PI/60)/1000`);
+  assert.ok(Math.abs(actual-derivative)<1e-7,`velocity at ${angle}°`);
+}
+assert.equal(run('total()'),3180);
+run('current.costSettings={quantity:10,labor:100,tooling:500,overhead:10}');
+assert.ok(Math.abs(run('costModel().all')-36630)<1e-8);
+assert.equal(run('validProject(initial)'),true);
+assert.equal(run('validProject({...initial,parts:[{name:"bad",material:"steel",qty:1,price:-1}]})'),false);
+assert.equal(run('validProject({...initial,costSettings:{quantity:"<img>",labor:0,tooling:0,overhead:0}})'),false);
+assert.equal(run('validProject({...initial,sketch:[{type:"circle",x:3,y:4,r:Infinity}]})'),false);
+run('current.notes=[{signature:projectSignature(current)}]');
+assert.equal(run('stale(current.notes[0])'),false);
+run('current.stroke=100');
+assert.equal(run('stale(current.notes[0])'),true);
+console.log('PASS: full-cycle geometry, 71 velocity derivative checks, batch pricing, import validation, and evidence invalidation.');
