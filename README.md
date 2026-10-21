@@ -52,3 +52,12 @@ See [api/REFINED_BRIEF.md](api/REFINED_BRIEF.md), [api/README.md](api/README.md)
 The same frontend now supports a same-origin FastAPI API with Argon2id passwords, verified accounts, revocable sessions, TOTP/Google adapters, account-owned profiles and projects, Stripe-hosted checkout, signature-verified/idempotent webhooks, billing history, security settings, notifications, data export/deletion and admin APIs/UI. The PostgreSQL migration and dependency lock are in `api/`.
 
 Static Sites hosting still serves the explicitly labeled account/payment preview. It does not run Python, provision PostgreSQL, deliver email or process payments. Serve the frontend through the API (or a same-origin reverse proxy) to activate server mode. Paid billing defaults off. The release checklist distinguishes tested code from provider and production validation still required.
+
+
+## Interface update (v5)
+
+The overview now has direct tool links and a project checklist. Project library supports search, discipline filters, pinned projects, name/revision sorting, grid/list views, duplication and individual JSON exports. Four starters create editable mechanism, DC circuit, enclosure and actuator-planning projects. Preferences include forest/cobalt accents, comfortable/compact density and reduced decorative motion. The Studio guide explains tools and their limits.
+
+New routes: `#/library`, `#/templates`, `#/settings`, `#/guide`. In API mode they pass through the same authentication gate as other account pages. New project copies and templates use the server project API; the hosted static preview continues using browser storage. Pins and appearance preferences are device-local in both modes. No paid capability or payment service was enabled by this UI update.
+
+Validation: JavaScript syntax checks; `node tests/calculations.cjs`; `node tests/templates.cjs`; all four template payloads checked with `api.project_data.project_data`; browser checks of template creation, calculated results, duplication, search, filters, layout preferences and responsive navigation.

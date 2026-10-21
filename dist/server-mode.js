@@ -46,7 +46,7 @@
  async function secureRoute(){const seq=++sequence;let route=location.hash.replace(/^#\/?/,'').split(/[?#]/)[0]||'landing';productRoute=route;playback=false;cancelAnimationFrame(raf);document.body.classList.add('productMode');productRoot.innerHTML='<div class="empty" role="status">Loading your studio…</div>';
   try{const publicRoutes=['landing','pricing','upgrade','signup','login','forgot','resend','verify','reset','mfa'];me=null;try{me=await api('/me')}catch(e){if(e.status!==401)throw e}signedIn=!!me;account=me?{name:me.name,email:me.email,role:me.role}:null;
    if(!publicRoutes.includes(route)&&!me){location.hash='/login';return}
-   if(me&&['dashboard','premium','workspace'].includes(route))await loadProjects();
+   if(me&&['dashboard','premium','workspace','library','templates'].includes(route))await loadProjects();
    let html;
    if(['signup','login'].includes(route))html=authForm(route);
    else if(['forgot','resend','verify','reset','mfa'].includes(route))html=recoveryPage(route);
@@ -55,9 +55,13 @@
    else if(route==='admin')html=await secureAdmin();
    else if(route==='checkout')html=`${publicHeader()}<main class="confirmationMain"><span class="eyebrow">SECURE HOSTED CHECKOUT</span><h1>Review your upgrade</h1><p>Your ${annual?'annual':'monthly'} Premium price, taxes, trial terms and any eligible promotion are shown on Stripe before you pay.</p><div class="note">Paid features are not yet defined. Confirm your plan terms before completing a purchase.</div><button id="secureCheckout" class="primary full" style="margin-top:25px" ${config.payments_enabled?'':'disabled'}>Continue to Stripe checkout ↗</button><p>${config.payments_enabled?'Payment details go directly to Stripe.':'Checkout is unavailable until the operator configures Stripe and final plan prices.'}</p></main>${publicFooter()}`;
    else if(route==='confirmation'){const b=await api('/billing');html=`${publicHeader()}<main class="confirmationMain"><h1>${b.plan==='premium'?'Your subscription is active.':'Waiting for payment confirmation.'}</h1><p>${b.plan==='premium'?'The server has confirmed your access with Stripe.':'A return from checkout does not prove payment. Access changes only after a verified provider event.'}</p><button id="refreshConfirmation">Check status</button><div class="heroActions">${routeLink('billing','View billing','pbutton')}${routeLink('premium','Premium dashboard ↗','pbutton primary')}</div></main>${publicFooter()}`}
-   else if(route==='workspace'){await api('/workspace');if(seq!==sequence)return;productRoot.innerHTML='';document.body.classList.remove('productMode');page='design';render();document.title='Design workspace · Engineering Studio';return}
+   else if(route==='workspace'){await api('/workspace');if(seq!==sequence)return;productRoot.innerHTML='';document.body.classList.remove('productMode');page=studioWorkspaceTab();render();document.title='Design workspace · Engineering Studio';return}
    else if(route==='premium'){await api('/premium');html=dashboardPage(true)}
    else if(route==='dashboard')html=dashboardPage(false);
+   else if(route==='library')html=libraryPage();
+   else if(route==='templates')html=templatesPage();
+   else if(route==='settings')html=settingsPage();
+   else if(route==='guide')html=guidePage();
    else if(route==='pricing')html=pricingPage(false);
    else if(route==='upgrade')html=pricingPage(true);
    else html=landingPage();
@@ -71,6 +75,7 @@
  // Keep network writes ordered and isolated to the account/profile that initiated them.
  persist=function(){if(!server)return previewPersist();const batch=structuredClone(projects),profile=me?.active_profile;if(!profile)return;$('#saved').textContent='Saving to server…';saveQueue=saveQueue.catch(()=>{}).then(async()=>{if(me?.active_profile!==profile)throw Error('Profile changed before save completed.');for(const p of batch){if(p.id.startsWith('local-')){const result=await api('/projects','POST',p);const live=projects.find(x=>x.id===p.id);if(live)live.id=result.id}else await api('/projects/'+encodeURIComponent(p.id),'PATCH',p)}$('#saved').textContent='● Saved to server'}).catch(e=>{status('saved','Save failed · export a backup');toast(e.message)})};
  const previewRender=render;render=function(){previewRender();if(server){const footer=document.querySelector('.app main>footer>span:first-child');if(footer)footer.textContent='● Server-owned project · export backups';document.querySelector('.beta').innerHTML='STUDIO <span>v0.4</span>'}};
+ const previewSaveNew=saveNewStudioProject;saveNewStudioProject=async function(project){if(!server)return previewSaveNew(project);await saveQueue;const result=await api('/projects','POST',project);const clean=(await api('/projects')).find(p=>p.id===result.id);if(!clean)throw Error('Project was saved but could not be loaded. Refresh the library.');projects.push(clean);current=clean;return clean};
  const previewNew=newProject;newProject=function(){if(!server)return previewNew();modal('Create project',field('serverNewName','Project name',''),async f=>{try{const blank={...structuredClone(initial),name:f.get('serverNewName').trim(),parts:[],notes:[],revisions:[]};const r=await api('/projects','POST',blank);blank.id=r.id;projects.push(blank);current=blank;if(location.hash==='#/workspace'){page='design';render()}else location.hash='/workspace'}catch(e){toast(e.message)}})};
  const previewImport=importProject;importProject=function(){if(!server)return previewImport();const input=document.createElement('input');input.type='file';input.accept='.json';input.onchange=async()=>{try{const file=input.files[0];if(!file||file.size>1000000)throw Error('Choose a project smaller than 1 MB.');const p=JSON.parse(await file.text());const r=await api('/projects','POST',p);const clean=(await api('/projects')).find(x=>x.id===r.id);projects.push(clean);current=clean;page='design';render();toast('Project imported into this profile')}catch(e){toast(e.message)}};input.click()};
  $('#newProject').onclick=()=>newProject();$('#importProject').onclick=()=>importProject();const importAction=quickActions.find(a=>a[0]==='Import project JSON');if(importAction)importAction[1]=()=>importProject();
