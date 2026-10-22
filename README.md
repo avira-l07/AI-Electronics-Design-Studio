@@ -4,6 +4,8 @@ Browser-local engineering concept workspace. Serve `dist/` using any static HTTP
 
 Latest reliability and UI changes: [QUALITY_REVIEW.md](QUALITY_REVIEW.md). Run `npm test` for all JavaScript regressions. Site visibility is managed separately by the owner.
 
+3D workspace v8.1: [V8_REVIEW.md](V8_REVIEW.md) documents the reviewed bugs, fixes, validation and CAD/export limitations. Open `#/workspace?tool=3d` to insert and customize concept parts. Assemblies are included in project JSON, history and backups.
+
 ## Version 0.2
 
 - Parameter-driven 2D slider-crank scene with playback, angle scrubbing, wireframe and SVG export.

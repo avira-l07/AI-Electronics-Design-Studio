@@ -1,6 +1,7 @@
 """Validate imported projects at the trust boundary, including revision snapshots."""
 import json, math
 from fastapi import HTTPException
+from api.assembly_data import validate_assembly
 
 def project_data(data,depth=0):
     def invalid():raise HTTPException(422,'Invalid engineering project data')
@@ -18,6 +19,7 @@ def project_data(data,depth=0):
         if not isinstance(data.get(key,[]),list) or len(data.get(key,[]))>maximum:invalid()
     for p in data.get('parts',[]):
         if not isinstance(p,dict) or not all(string(p.get(k),200) for k in ['name','material']) or type(p.get('qty'))!=int or not 1<=p['qty']<=100000 or not number(p.get('price')) or not 0<=p['price']<1e12:invalid()
+        if 'source3dKey' in p and not string(p['source3dKey'],1000):invalid()
     for n in data.get('notes',[]):
         if not isinstance(n,dict) or not all(string(n.get(k),10000) for k in ['title','body','type','date']) or not string(n.get('signature',''),100000):invalid()
     for shape in data.get('sketch',[]):
@@ -48,7 +50,8 @@ def project_data(data,depth=0):
         if rev.get('snapshot',{}).get('revisions'):invalid()
         revisions.append({'label':rev['label'],'date':rev['date'],'snapshot':json.loads(project_data(rev['snapshot'],depth+1))})
     if not string(data.get('electrical',''),10000):invalid()
-    allowed=['name','kind','stroke','rod','rpm','material','parts','notes','revisions','sketch','buildTasks','circuit','costSettings','electrical','designType','currency','resistorNetwork']
+    if 'assembly3d' in data:validate_assembly(data['assembly3d'])
+    allowed=['name','kind','stroke','rod','rpm','material','parts','notes','revisions','sketch','buildTasks','circuit','costSettings','electrical','designType','currency','resistorNetwork','assembly3d']
     clean={k:data[k] for k in allowed if k in data}
     clean['revisions']=revisions
     for k in ['parts','notes','revisions']:clean.setdefault(k,[])

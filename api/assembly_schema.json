@@ -1,0 +1,117 @@
+{
+  "materials": [
+    "Steel",
+    "Aluminium 6061",
+    "ABS polymer",
+    "Brass",
+    "FR4",
+    "Aluminium / Steel"
+  ],
+  "parts": {
+    "bracket_l": {
+      "width": 40,
+      "height": 40,
+      "thickness": 4
+    },
+    "plate_flat": {
+      "width": 80,
+      "height": 60,
+      "thickness": 3
+    },
+    "angle_extrusion": {
+      "width": 20,
+      "height": 20,
+      "length": 100
+    },
+    "beam_box": {
+      "width": 30,
+      "height": 30,
+      "length": 120,
+      "thickness": 2
+    },
+    "shaft_round": {
+      "diameter": 12,
+      "length": 100
+    },
+    "gear_spur": {
+      "diameter": 40,
+      "thickness": 10,
+      "teeth": 20
+    },
+    "pulley": {
+      "diameter": 50,
+      "width": 15,
+      "boreDiameter": 10
+    },
+    "flange_coupler": {
+      "diameter": 30,
+      "length": 25,
+      "boreDiameter": 8
+    },
+    "bearing_ball": {
+      "outerDiameter": 52,
+      "innerDiameter": 25,
+      "width": 15
+    },
+    "bearing_flange": {
+      "outerDiameter": 47,
+      "innerDiameter": 25,
+      "width": 12,
+      "flangeDiameter": 58
+    },
+    "linear_bush": {
+      "diameter": 21,
+      "innerDiameter": 12,
+      "length": 30
+    },
+    "bolt_hex": {
+      "diameter": 8,
+      "length": 30,
+      "headDiameter": 13
+    },
+    "nut_hex": {
+      "diameter": 8,
+      "acrossFlats": 13,
+      "thickness": 6.5
+    },
+    "standoff": {
+      "diameter": 6,
+      "length": 20
+    },
+    "motor_nema17": {
+      "width": 42,
+      "height": 42,
+      "length": 40,
+      "shaftDiameter": 5,
+      "shaftLength": 22
+    },
+    "motor_dc": {
+      "diameter": 37,
+      "length": 52,
+      "shaftDiameter": 4,
+      "shaftLength": 18
+    },
+    "servo_std": {
+      "width": 23,
+      "height": 29,
+      "length": 12.5
+    },
+    "enclosure_box": {
+      "width": 100,
+      "height": 60,
+      "depth": 40,
+      "wallThickness": 3
+    },
+    "enclosure_din": {
+      "width": 45,
+      "height": 90,
+      "depth": 65,
+      "wallThickness": 2
+    },
+    "pcb_board": {
+      "width": 80,
+      "height": 60,
+      "thickness": 1.6
+    }
+  }
+}

@@ -14,6 +14,8 @@ const StudioProjectData = (() => {
     }
     if (!Array.isArray(p.parts) || !Array.isArray(p.notes) || (depth === 0 && !Array.isArray(p.revisions))) return false;
     if (!p.parts.every(a => object(a) && text(a.name,200) && text(a.material,200) && Number.isInteger(a.qty) && a.qty >= 1 && a.qty <= 100000 && number(a.price) && a.price >= 0 && a.price < 1e12)) return false;
+    if(p.parts.some(a=>a.source3dKey!==undefined&&!text(a.source3dKey,1000)))return false;
+    if(p.assembly3d!==undefined&&(typeof StudioAssembly==='undefined'||!StudioAssembly.validate(p.assembly3d)))return false;
     if (!p.notes.every(n => object(n) && ['title','body','type','date'].every(k => text(n[k],10000)) && (n.signature === undefined || text(n.signature,100000)))) return false;
     for (const s of p.sketch || []) {
       if (!object(s) || !['rect','circle','line','text','dimension'].includes(s.type)) return false;

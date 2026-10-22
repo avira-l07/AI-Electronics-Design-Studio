@@ -2,6 +2,8 @@
 
 Latest follow-up: **35 API tests passed**. New cases reject blank project names, non-finite circuit results and integer-overflow inputs. Frontend save/recovery regressions and verification limits are recorded in `../QUALITY_REVIEW.md`.
 
+3D follow-up: **47 API tests passed** with validated portable assemblies, nested snapshots and empty-scene persistence. See `../V8_REVIEW.md` for the latest frontend and operational limits.
+
 ## Completed in this workspace
 
 - 25 Python integration/edge-case tests passed against isolated SQLite databases, using real Argon2id, JWTs, cookies, CSRF checks, database queries and actual Stripe webhook signature verification.

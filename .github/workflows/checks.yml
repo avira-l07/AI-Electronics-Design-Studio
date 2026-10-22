@@ -12,7 +12,7 @@ jobs:
       - run: pip install -r api/requirements.lock
       - run: python -m pytest api/tests -q
       - run: npm test
-      - run: node --check dist/project-format.js && node --check dist/studio-quality.js && node --check dist/studio-tools.js && node --check dist/server-mode.js
+      - run: node --check dist/project-format.js && node --check dist/assembly-data.js && node --check dist/studio-quality.js && node --check dist/studio-tools.js && node --check dist/studio-3d.js && node --check dist/server-mode.js
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e

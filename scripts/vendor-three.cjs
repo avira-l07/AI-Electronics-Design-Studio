@@ -1,0 +1,11 @@
+const fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(__dirname,'..'),src=path.join(root,'node_modules/three'),out=path.join(root,'dist/vendor/three');
+const info=JSON.parse(fs.readFileSync(path.join(src,'package.json'),'utf8'));
+if(info.version!=='0.161.0')throw Error('Review the Three.js version before updating vendored files.');
+fs.mkdirSync(out,{recursive:true});
+fs.copyFileSync(path.join(src,'build/three.module.min.js'),path.join(out,'three.module.js'));
+fs.copyFileSync(path.join(src,'LICENSE'),path.join(out,'LICENSE.txt'));
+fs.writeFileSync(path.join(out,'OrbitControls.js'),fs.readFileSync(path.join(src,'examples/jsm/controls/OrbitControls.js'),'utf8').replace("from 'three'","from './three.module.js'"));
+fs.writeFileSync(path.join(out,'package.json'),'{"type":"module","private":true}\n');
+for(const name of ['three.module.mjs','OrbitControls.mjs'])if(fs.existsSync(path.join(out,name)))fs.unlinkSync(path.join(out,name));
+console.log('Vendored Three.js 0.161.0 and official OrbitControls with MIT license.');
