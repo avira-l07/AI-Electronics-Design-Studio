@@ -24,3 +24,12 @@ The test runner emitted one upstream Starlette warning that httpx-based TestClie
 - Dependency artifact hashes/reproducible installation and continued advisory monitoring. The present lock pins versions but is not hash-locked.
 
 Paid billing defaults off. The current Sites publication is still a private static preview; uploading Python source alongside it does not deploy an API or activate payments.
+
+
+## Gap update validation
+
+- **32 API tests passed** after the gap update. Extended API coverage includes optimistic project version checks, recoverable trash/restore, ownership isolation, snapshot sharing expiry/revocation, share revocation on trash, opt-in AI context and limits, extended sketch/network validation, and a repeatable legacy-schema upgrade preserving project contents.
+- Additional JavaScript checks validate series/parallel conservation of power and voltage/current, 71 analytic acceleration comparisons against numerical velocity derivatives, motion sampling bounds and DXF output entities.
+- Interactive browser checks exercise electronic design selection, network calculations, undo/redo, keyboard tabs, currency labels, sketch object property edits, dark theme persistence, local Trash/restore and real API parameter persistence. Optional AI calls use a mocked provider; no real model key or paid service has been used.
+- The standalone Playwright suite defines six desktop/phone test cases. Dependency installation and test discovery were checked here; the standalone runner was not executed on this Windows host. Equivalent interactive flows were checked using the supported browser tool. Remote GitHub Actions execution remains unverified.
+- Docker is unavailable on this host. Container builds, Caddy TLS, PostgreSQL concurrency, SMTP delivery, live provider calls and operational backup/restore remain staging acceptance requirements.

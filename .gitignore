@@ -10,3 +10,6 @@ __pycache__/
 *.log
 .coverage
 tmp/
+node_modules/
+test-results/
+playwright-report/

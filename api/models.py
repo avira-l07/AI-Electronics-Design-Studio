@@ -61,6 +61,16 @@ class Project(Base):
     profile_id: Mapped[str]=mapped_column(ForeignKey('profiles.id'),index=True)
     data: Mapped[str]=mapped_column(Text)
     updated: Mapped[int]=mapped_column(Integer,default=now)
+    version: Mapped[int]=mapped_column(Integer,default=1,server_default='1')
+    trashed: Mapped[bool]=mapped_column(Boolean,default=False,server_default='false')
+class Share(Base):
+    __tablename__='project_shares'
+    id: Mapped[str]=mapped_column(String(36),primary_key=True,default=uid)
+    project_id: Mapped[str]=mapped_column(ForeignKey('projects.id',ondelete='CASCADE'),index=True)
+    token_hash: Mapped[str]=mapped_column(String(64),unique=True)
+    snapshot: Mapped[str]=mapped_column(Text)
+    expires: Mapped[int]=mapped_column(Integer)
+    revoked: Mapped[bool]=mapped_column(Boolean,default=False)
 class UsedRefresh(Base):
     __tablename__='used_refresh_tokens'
     digest: Mapped[str]=mapped_column(String(64),primary_key=True)

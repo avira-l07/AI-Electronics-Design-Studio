@@ -61,3 +61,12 @@ The overview now has direct tool links and a project checklist. Project library 
 New routes: `#/library`, `#/templates`, `#/settings`, `#/guide`. In API mode they pass through the same authentication gate as other account pages. New project copies and templates use the server project API; the hosted static preview continues using browser storage. Pins and appearance preferences are device-local in both modes. No paid capability or payment service was enabled by this UI update.
 
 Validation: JavaScript syntax checks; `node tests/calculations.cjs`; `node tests/templates.cjs`; all four template payloads checked with `api.project_data.project_data`; browser checks of template creation, calculated results, duplication, search, filters, layout preferences and responsive navigation.
+
+
+## Gap improvements (v6)
+
+See [GAP_CLOSURE.md](GAP_CLOSURE.md) for completed work and remaining gaps. The update adds project Trash/restore, edit undo/redo, design models, an expanded sketch editor, DC resistor networks, motion acceleration plots, dark mode, currency labels, workspace search and notifications. API saves now use version checks and pause on conflicts. Optional AI/share endpoints default off.
+
+Backend upgrades require `python -m api.migrate` before starting the new API. Existing browser-local projects remain compatible. Production setup, HTTPS/proxy configuration, the mail/reconciliation worker and external-service acceptance checks are documented in [deploy/README.md](deploy/README.md). The Sites preview does not run the Python backend.
+
+Additional checks: `node tests/engineering.cjs`, `python -m pytest api/tests -q`. Browser test source: `tests/browser/studio.spec.cjs`; install with `npm ci`, install the CI Chromium browser with `npx playwright install chromium`, then run `npm run test:e2e`. The test runner serves a disposable static origin and uses isolated browser contexts. The GitHub Actions workflow runs these checks; no remote CI run has been triggered from this chat.

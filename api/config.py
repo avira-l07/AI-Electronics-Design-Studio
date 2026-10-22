@@ -24,6 +24,10 @@ class Settings:
     smtp_user: str = os.getenv('SMTP_USER', '')
     smtp_password: str = os.getenv('SMTP_PASSWORD', '')
     mail_from: str = os.getenv('MAIL_FROM', '')
+    ai_key: str = os.getenv('OPENAI_API_KEY', '')
+    ai_model: str = os.getenv('OPENAI_MODEL', '')
+    ai_enabled: bool = os.getenv('AI_ENABLED', 'false').lower() == 'true'
+    sharing_enabled: bool = os.getenv('SHARING_ENABLED', 'false').lower() == 'true'
     @property
     def secure_cookies(self):return self.environment=='production'
 

@@ -118,3 +118,10 @@ node tests/calculations.cjs
 ```
 
 Create `tmp/` first if your platform does not create the parent. Use a disposable test DB. Tests verify real Argon2 hashing, actual cookies/JWTs, signed webhook verification, database access checks and state transitions. Provider API responses and email delivery are mocked: no customer is charged and no email is sent by tests. PostgreSQL concurrency, real Google exchanges, SMTP delivery and Stripe test-mode lifecycles still require staging validation.
+
+
+## Version 0002 upgrade
+
+Before starting this version against an existing database, back it up and run `python -m api.migrate`. The additive upgrade preserves project content and adds version/trash fields and snapshot-share storage. The SQL equivalent is `migrations/0002_project_lifecycle.sql` after the original `0001_initial.sql`. `generate_schema.py` now writes `bootstrap_current.sql` for an empty PostgreSQL database; it does not overwrite historical migrations. Use one initialization path, not both bootstrap and incremental scripts.
+
+See `../deploy/README.md` for the separate worker and production configuration and `../GAP_CLOSURE.md` for feature boundaries. Recovered project Trash is distinct from permanent profile/account deletion. AI and sharing default off; the hosted Sites preview continues to use browser-local storage.

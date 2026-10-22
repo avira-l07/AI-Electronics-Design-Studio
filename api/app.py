@@ -96,7 +96,7 @@ def create_app(settings=None,gateway=None):
         return {'id':user.id,'name':user.name,'email':user.email,'role':user.role,'plan':plan.id,'profile_limit':plan.profile_limit,'active_profile':session.profile_id,'mfa_enabled':bool(user.totp),'profiles':[{'id':p.id,'name':p.name,'bio':p.bio,'available':p.id in eligible} for p in profiles]}
 
     @app.get('/api/config')
-    def config():return {'mode':'server','google_enabled':bool(s.google_client and s.google_secret),'payments_enabled':bool(s.billing_enabled and s.stripe_key and s.webhook_key and s.monthly_price and s.annual_price),'trial_days':s.trial_days}
+    def config():return {'mode':'server','google_enabled':bool(s.google_client and s.google_secret),'payments_enabled':bool(s.billing_enabled and s.stripe_key and s.webhook_key and s.monthly_price and s.annual_price),'trial_days':s.trial_days,'ai_enabled':bool(s.ai_enabled and s.ai_key and s.ai_model),'sharing_enabled':s.sharing_enabled}
     @app.get('/api/csrf')
     def csrf(request:Request,response:Response):return {'token':issue_csrf(s,response,csrf_binding(s,request))}
     @app.post('/api/auth/signup',status_code=202)
@@ -199,11 +199,11 @@ def create_app(settings=None,gateway=None):
         session.profile_id=id;audit(db,user,'profile.switched');return {'active_profile':id}
     @app.delete('/api/profiles/{id}')
     def delete_profile(id:str,who=Depends(auth),db=Depends(db_session)):
-        user,_=who;profiles=list(db.scalars(select(Profile).where(Profile.user_id==user.id).order_by(Profile.created,Profile.id)))
+        user,session=who;recent(user,session);profiles=list(db.scalars(select(Profile).where(Profile.user_id==user.id).order_by(Profile.created,Profile.id)))
         if len(profiles)<=1:fail(400,'Keep at least one profile')
         profile=next((p for p in profiles if p.id==id),None)
         if not profile:fail(404,'Profile not found')
-        db.execute(delete(Project).where(Project.profile_id==id,Project.user_id==user.id));fallback=next(p for p in profiles if p.id!=id);db.execute(update(Session).where(Session.user_id==user.id,Session.profile_id==id).values(profile_id=fallback.id));db.delete(profile);return {'deleted':True}
+        db.execute(delete(Project).where(Project.profile_id==id,Project.user_id==user.id));fallback=next(p for p in profiles if p.id!=id);db.execute(update(Session).where(Session.user_id==user.id,Session.profile_id==id).values(profile_id=fallback.id));db.delete(profile);audit(db,user,'profile.deleted');return {'deleted':True}
     @app.get('/api/workspace')
     def workspace(who=Depends(auth),db=Depends(db_session)):
         require_profile(db,s,*who);return {'authorized':True,'profile_id':who[1].profile_id}
@@ -211,20 +211,21 @@ def create_app(settings=None,gateway=None):
     def premium(who=Depends(auth),db=Depends(db_session)):
         require_premium(db,s,who[0]);require_profile(db,s,*who);return {'authorized':True,'profile_limit':5,'features':[]}
     @app.get('/api/projects')
-    def projects(who=Depends(auth),db=Depends(db_session)):
+    def projects(trash:bool=False,who=Depends(auth),db=Depends(db_session)):
         user,session=who;require_profile(db,s,user,session)
-        return [{**json.loads(p.data),'id':p.id} for p in db.scalars(select(Project).where(Project.user_id==user.id,Project.profile_id==session.profile_id).order_by(Project.updated.desc()))]
+        return [{**json.loads(p.data),'id':p.id,'version':p.version} for p in db.scalars(select(Project).where(Project.user_id==user.id,Project.profile_id==session.profile_id,Project.trashed==trash).order_by(Project.updated.desc()))]
     @app.post('/api/projects',status_code=201)
     def create_project(body:dict,who=Depends(auth),db=Depends(db_session)):
         user,session=who;require_profile(db,s,user,session)
         if db.scalar(select(func.count()).select_from(Project).where(Project.user_id==user.id))>=1000:fail(403,'Account project capacity reached')
-        row=Project(user_id=user.id,profile_id=session.profile_id,data=project_data(body));db.add(row);db.flush();return {'id':row.id}
+        row=Project(user_id=user.id,profile_id=session.profile_id,data=project_data(body));db.add(row);db.flush();return {'id':row.id,'version':row.version}
     @app.patch('/api/projects/{id}')
     def update_project(id:str,body:dict,who=Depends(auth),db=Depends(db_session)):
         user,session=who;require_profile(db,s,user,session)
-        row=db.scalar(select(Project).where(Project.id==id,Project.user_id==user.id,Project.profile_id==session.profile_id))
+        row=db.scalar(select(Project).where(Project.id==id,Project.user_id==user.id,Project.profile_id==session.profile_id,Project.trashed==False).with_for_update())
         if not row:fail(404,'Project not found')
-        row.data=project_data(body);row.updated=now();return {'saved':True}
+        if type(body.get('version'))!=int or body['version']!=row.version:fail(409,'A newer project version exists. Export your edits, then reload the server version.')
+        row.data=project_data(body);row.updated=now();row.version+=1;return {'saved':True,'version':row.version}
     @app.get('/api/sessions')
     def sessions(who=Depends(auth),db=Depends(db_session)):
         user,current=who;rows=db.scalars(select(Session).where(Session.user_id==user.id,Session.revoked==False,Session.expires>now()))
@@ -299,12 +300,15 @@ def create_app(settings=None,gateway=None):
         if not row:fail(404,'Notification not found')
         row.read=True;return {'read':True}
     @app.get('/api/admin')
-    def admin(who=Depends(auth),db=Depends(db_session)):
+    def admin(q:str='',offset:int=0,who=Depends(auth),db=Depends(db_session)):
         user,session=who;require_admin(user);recent(user,session)
         if not user.totp:fail(403,'Administrators must enable two-factor authentication')
-        users=db.scalars(select(User).where(User.deleted==False).limit(200))
+        if len(q)>100 or not 0<=offset<=1000000:fail(422,'Invalid search or page')
+        criteria=[User.deleted==False]
+        if q:criteria.append(func.lower(User.email).contains(q.lower(),autoescape=True))
+        users=list(db.scalars(select(User).where(*criteria).order_by(User.created,User.id).offset(offset).limit(50)))
         money=db.execute(select(Payment.currency,func.sum(Payment.amount-Payment.refunded)).where(Payment.status.in_(['paid','partially_refunded','refunded'])).group_by(Payment.currency)).all()
-        return {'users':[{'id':u.id,'email':u.email,'name':u.name,'banned':u.banned,'role':u.role} for u in users],'revenue_minor_units':{c:int(a or 0) for c,a in money},'recent_payments':[{'id':p.id,'status':p.status,'amount':p.amount,'currency':p.currency} for p in db.scalars(select(Payment).order_by(Payment.created.desc()).limit(100))]}
+        return {'users':[{'id':u.id,'email':u.email,'name':u.name,'banned':u.banned,'role':u.role} for u in users],'total':db.scalar(select(func.count()).select_from(User).where(*criteria)),'offset':offset,'revenue_minor_units':{c:int(a or 0) for c,a in money},'recent_payments':[{'id':p.id,'status':p.status,'amount':p.amount,'currency':p.currency} for p in db.scalars(select(Payment).order_by(Payment.created.desc()).limit(100))]}
     @app.post('/api/admin/users/{id}/ban')
     def ban(id:str,body:BanInput,who=Depends(auth),db=Depends(db_session)):
         user,session=who;require_admin(user);recent(user,session)
@@ -316,7 +320,7 @@ def create_app(settings=None,gateway=None):
     @app.get('/api/account/export')
     def export_account(who=Depends(auth),db=Depends(db_session)):
         user,session=who;recent(user,session)
-        return {'account':public_user(db,user,session),'notifications':[{'message':n.message,'created':n.created} for n in db.scalars(select(Notice).where(Notice.user_id==user.id))],'billing':[{'id':p.id,'amount':p.amount,'currency':p.currency,'status':p.status,'refunded':p.refunded} for p in db.scalars(select(Payment).where(Payment.user_id==user.id))],'projects':[{**json.loads(p.data),'id':p.id,'profile_id':p.profile_id} for p in db.scalars(select(Project).where(Project.user_id==user.id))]}
+        return {'account':public_user(db,user,session),'notifications':[{'message':n.message,'created':n.created} for n in db.scalars(select(Notice).where(Notice.user_id==user.id))],'billing':[{'id':p.id,'amount':p.amount,'currency':p.currency,'status':p.status,'refunded':p.refunded} for p in db.scalars(select(Payment).where(Payment.user_id==user.id))],'projects':[{**json.loads(p.data),'id':p.id,'profile_id':p.profile_id,'version':p.version,'trashed':p.trashed} for p in db.scalars(select(Project).where(Project.user_id==user.id))]}
     @app.delete('/api/account')
     def delete_account(body:Credentials,request:Request,response:Response,who=Depends(auth),db=Depends(db_session)):
         rate(db,request,'delete-account',5);user,session=who;recent(user,session)
@@ -361,6 +365,8 @@ def create_app(settings=None,gateway=None):
 
     @app.exception_handler(IntegrityError)
     async def integrity_error(request,exc):return JSONResponse({'detail':'Conflicting update. Retry the request.'},409)
+    from api.features import install_features
+    install_features(app,auth,db_session)
     # Static mount is last. The standalone API can serve this same frontend under one origin.
     app.mount('/',StaticFiles(directory=Path(__file__).resolve().parent.parent/'dist',html=True),name='frontend')
     return app

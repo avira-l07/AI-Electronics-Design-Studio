@@ -1,0 +1,65 @@
+name: engineering-studio
+services:
+  database:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: studio
+      POSTGRES_USER: studio
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the deployment environment}
+    volumes: [studio-db:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U studio -d studio]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    networks: [studio]
+  migrate:
+    build: {context: .., dockerfile: deploy/Dockerfile}
+    env_file: ../.env.production
+    command: [python, -m, api.migrate]
+    depends_on: {database: {condition: service_healthy}}
+    networks: [studio]
+  api:
+    build: {context: .., dockerfile: deploy/Dockerfile}
+    env_file: ../.env.production
+    depends_on: {migrate: {condition: service_completed_successfully}}
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, python, -c, "import http.client,os,urllib.parse; c=http.client.HTTPConnection('127.0.0.1',8000,timeout=3); c.request('GET','/api/health',headers={'Host':urllib.parse.urlparse(os.environ['APP_ORIGIN']).netloc,'X-Forwarded-Proto':'https'}); raise SystemExit(c.getresponse().status!=200)"]
+      interval: 30s
+      retries: 3
+    networks: [studio]
+  worker:
+    build: {context: .., dockerfile: deploy/Dockerfile}
+    env_file: ../.env.production
+    command: [python, -m, api.worker]
+    depends_on: {migrate: {condition: service_completed_successfully}}
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks: [studio]
+  proxy:
+    image: caddy:2-alpine
+    environment:
+      STUDIO_DOMAIN: ${STUDIO_DOMAIN:?Set STUDIO_DOMAIN}
+    ports: ["80:80", "443:443"]
+    volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro", "caddy-data:/data", "caddy-config:/config"]
+    depends_on: [api]
+    restart: unless-stopped
+    networks:
+      studio: {ipv4_address: 172.30.0.10}
+networks:
+  studio:
+    ipam:
+      config: [{subnet: 172.30.0.0/24}]
+volumes:
+  studio-db:
+  caddy-data:
+  caddy-config:
