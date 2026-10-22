@@ -1,6 +1,19 @@
 /* Bounded, portable assembly model. Distances mm; rotations degrees. */
 const StudioAssembly=(()=>{
   const CATALOGUE = [
+    { cat: 'Drone & Multirotor', parts: [
+      {id:'quad_plate',name:'Quadcopter frame plate',desc:'Drilled concept centre plate',icon:'plate',dims:{width:80,height:60,thickness:2.5},mat:'Carbon fibre',col:0x303c40},
+      {id:'quad_arm',name:'Quadcopter arm',desc:'Tapered arm with mounting holes',icon:'beam',dims:{width:22,length:113.723,thickness:4},mat:'Carbon fibre',col:0x303c40},
+      {id:'motor_brushless',name:'Brushless outrunner',desc:'Generic motor envelope',icon:'motor_dc',dims:{diameter:28,length:20,shaftDiameter:5,shaftLength:9},mat:'Aluminium / Steel',col:0xa45b32},
+      {id:'propeller_cw',name:'Two-blade propeller · CW',desc:'Illustrative clockwise blade pitch',icon:'shaft',dims:{diameter:127,thickness:2.5,boreDiameter:5},mat:'ABS polymer',col:0x3a4040},
+      {id:'propeller_ccw',name:'Two-blade propeller · CCW',desc:'Illustrative counterclockwise pitch',icon:'shaft',dims:{diameter:127,thickness:2.5,boreDiameter:5},mat:'ABS polymer',col:0x3a4040},
+      {id:'battery_pack',name:'Drone battery pack',desc:'Envelope only · ratings unspecified',icon:'enclosure',dims:{width:36,height:25,depth:76},mat:'ABS polymer',col:0x35473c},
+      {id:'battery_strap',name:'Battery retaining strap',desc:'Rectangular strap envelope',icon:'bracket',dims:{width:40,height:29,depth:12,wallThickness:1},mat:'ABS polymer',col:0x343638},
+      {id:'flight_controller',name:'Flight controller board',desc:'30 mm hole pattern · concept',icon:'pcb',dims:{width:36,height:36,thickness:1.6},mat:'FR4',col:0x1a4a28},
+      {id:'esc_board',name:'Four-in-one ESC board',desc:'30 mm hole pattern · concept',icon:'pcb',dims:{width:36,height:36,thickness:1.6},mat:'FR4',col:0x1a4a28},
+      {id:'screw_cap',name:'Socket cap screw',desc:'Unthreaded M3 concept',icon:'bolt',dims:{diameter:3,length:10,headDiameter:5.5},mat:'Steel',col:0x88948d},
+      {id:'washer',name:'Flat washer',desc:'M3 clearance concept',icon:'bearing',dims:{outerDiameter:6,innerDiameter:3.2,thickness:0.6},mat:'Steel',col:0x88948d},
+    ]},
     { cat: 'Structural', parts: [
       { id: 'bracket_l',      name: 'L-Bracket',        desc: '90° mount',       icon: 'bracket',   dims: { width: 40, height: 40, thickness: 4 },                 mat: 'Steel',          col: 0x8a9a8a },
       { id: 'plate_flat',     name: 'Flat Plate',       desc: 'Base plate',      icon: 'plate',     dims: { width: 80, height: 60, thickness: 3 },                 mat: 'Aluminium 6061', col: 0xa8b8c8 },
@@ -35,7 +48,7 @@ const StudioAssembly=(()=>{
     ]},
   ];
 
-  const materials=['Steel','Aluminium 6061','ABS polymer','Brass','FR4','Aluminium / Steel'];
+  const materials=['Steel','Aluminium 6061','ABS polymer','Brass','FR4','Aluminium / Steel','Carbon fibre'];
   const parts=CATALOGUE.flatMap(c=>c.parts);
   const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
   const finite=v=>typeof v==='number'&&Number.isFinite(v);
@@ -77,7 +90,7 @@ const StudioAssembly=(()=>{
       const dims=Object.fromEntries(Object.entries(o.dims).sort(([a],[b])=>a.localeCompare(b)));
       const key=JSON.stringify([o.partId,o.material,dims]);
       const previous=existing.find(p=>p.source3dKey===key);
-      if(!groups.has(key))groups.set(key,{name:(parts.find(p=>p.id===o.partId).name+' · '+Object.entries(dims).map(([k,v])=>k+' '+v).join(' / ')).slice(0,200),material:o.material,qty:0,price:previous?.price||0,source3dKey:key});
+      if(!groups.has(key))groups.set(key,{name:(parts.find(p=>p.id===o.partId).name+' · '+Object.entries(dims).map(([k,v])=>k+' '+Number(v.toFixed(3))).join(' / ')).slice(0,200),material:o.material,qty:0,price:previous?.price||0,source3dKey:key});
       groups.get(key).qty++;
     }
     return [...existing.filter(p=>!p.source3dKey),...groups.values()];

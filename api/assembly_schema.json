@@ -5,9 +5,67 @@
     "ABS polymer",
     "Brass",
     "FR4",
-    "Aluminium / Steel"
+    "Aluminium / Steel",
+    "Carbon fibre"
   ],
   "parts": {
+    "quad_plate": {
+      "width": 80,
+      "height": 60,
+      "thickness": 2.5
+    },
+    "quad_arm": {
+      "width": 22,
+      "length": 113.723,
+      "thickness": 4
+    },
+    "motor_brushless": {
+      "diameter": 28,
+      "length": 20,
+      "shaftDiameter": 5,
+      "shaftLength": 9
+    },
+    "propeller_cw": {
+      "diameter": 127,
+      "thickness": 2.5,
+      "boreDiameter": 5
+    },
+    "propeller_ccw": {
+      "diameter": 127,
+      "thickness": 2.5,
+      "boreDiameter": 5
+    },
+    "battery_pack": {
+      "width": 36,
+      "height": 25,
+      "depth": 76
+    },
+    "battery_strap": {
+      "width": 40,
+      "height": 29,
+      "depth": 12,
+      "wallThickness": 1
+    },
+    "flight_controller": {
+      "width": 36,
+      "height": 36,
+      "thickness": 1.6
+    },
+    "esc_board": {
+      "width": 36,
+      "height": 36,
+      "thickness": 1.6
+    },
+    "screw_cap": {
+      "diameter": 3,
+      "length": 10,
+      "headDiameter": 5.5
+    },
+    "washer": {
+      "outerDiameter": 6,
+      "innerDiameter": 3.2,
+      "thickness": 0.6
+    },
     "bracket_l": {
       "width": 40,
       "height": 40,

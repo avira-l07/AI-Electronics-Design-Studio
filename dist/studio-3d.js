@@ -66,6 +66,7 @@
     'Brass': 0xc8a840,
     'FR4': 0x1a4a28,
     'Aluminium / Steel': 0x606868,
+    'Carbon fibre': 0x4c5e63,
   };
 
   const DIM_LABELS = {
@@ -126,6 +127,65 @@
     const s = 0.1; // 1 mm = 0.1 scene unit (1 unit = 10 mm)
 
     switch (p.id) {
+      case 'quad_plate': {
+        const W=d.width*s,H=d.height*s,shape=new T.Shape();
+        shape.moveTo(-W/2,-H/2);shape.lineTo(W/2,-H/2);shape.lineTo(W/2,H/2);shape.lineTo(-W/2,H/2);shape.closePath();
+        const holes=[[-30,0],[30,0],[0,-24],[0,24],[-15,-15],[-15,15],[15,-15],[15,15]];
+        for(const sx of [-1,1])for(const sz of [-1,1])for(const offset of [0,8])holes.push([sx*(30+offset*60/Math.hypot(60,72)),sz*(18+offset*72/Math.hypot(60,72))]);
+        holes.forEach(([x,z])=>{const h=new T.Path();h.absarc(x/80*W,z/60*H,Math.min(W,H)*.02,0,Math.PI*2,true);shape.holes.push(h);});
+        const geo=new T.ExtrudeGeometry(shape,{depth:d.thickness*s,bevelEnabled:false,curveSegments:12});geo.rotateX(Math.PI/2);geo.translate(0,d.thickness*s,0);return new T.Mesh(geo,mat());
+      }
+      case 'quad_arm': {
+        const W=d.width*s,L=d.length*s,shape=new T.Shape();
+        [[-W/2,-L/2],[W/2,-L/2],[W*.36,0],[W/2,L*.3],[W/2,L/2],[-W/2,L/2],[-W/2,L*.3],[-W*.36,0]].forEach(([x,z],i)=>i?shape.lineTo(x,z):shape.moveTo(x,z));shape.closePath();
+        const radius=Math.min(W*.073,L*.014),end=L*.41207;
+        const holes=[[0,-end],[0,-end+L*.070345]];
+        for(const x of [-W*8/22,W*8/22])for(const z of [-L*8/113.723,L*8/113.723])holes.push([x,end+z]);
+        holes.forEach(([x,z])=>{const h=new T.Path();h.absarc(x,z,radius,0,Math.PI*2,true);shape.holes.push(h);});
+        const geo=new T.ExtrudeGeometry(shape,{depth:d.thickness*s,bevelEnabled:false,curveSegments:12});geo.rotateX(Math.PI/2);geo.translate(0,d.thickness*s,0);return new T.Mesh(geo,mat());
+      }
+      case 'washer':return ring(d.outerDiameter*s/2,d.innerDiameter*s/2,d.thickness*s,mat());
+      case 'screw_cap': {
+        const H=d.diameter*s*.65;
+        return grp(cyl(d.diameter*s/2,d.length*s,16,0,-d.length*s/2,0),ring(d.headDiameter*s/2,d.diameter*s*.28,H,mat(),6));
+      }
+      case 'motor_brushless': {
+        const R=d.diameter*s/2,L=d.length*s;
+        const g=grp(cyl(R*.93,L*.12,32,0,L*.06,0,0x899397),ring(R*.9,R*.38,L*.78,mat(0x262e32)),ring(R,R*.85,L*.68,mat(0xa86039)),ring(R,d.shaftDiameter*s/2,L*.1,mat(0x9fa9ad)),cyl(d.shaftDiameter*s/2,d.shaftLength*s,24,0,L+d.shaftLength*s/2,0,0xb6c0c0));
+        g.children[1].position.y=L*.12;g.children[2].position.y=L*.22;g.children[3].position.y=L*.9;
+        for(let i=0;i<12;i++){const a=i*Math.PI/6;g.add(cyl(R*.12,L*.56,8,Math.cos(a)*R*.64,L*.46,Math.sin(a)*R*.64,0xb37446));}
+        return g;
+      }
+      case 'propeller_cw':
+      case 'propeller_ccw': {
+        const R=d.diameter*s/2,bore=d.boreDiameter*s/2,H=d.thickness*s,hub=Math.max(R*.14,bore+(R-bore)*.04),start=Math.max(hub*.75,bore+(hub-bore)*.5);
+        const propMat=()=>mat(p.mat==='ABS polymer'?(p.id==='propeller_cw'?0x88b887:0x688eaa):col);
+        const g=grp(ring(hub,bore,H,propMat()));
+        for(let i=0;i<2;i++){
+          const sh=new T.Shape();sh.moveTo(start,0);sh.bezierCurveTo(R*.4,-R*.09,R*.88,-R*.14,R,0);sh.bezierCurveTo(R*.86,R*.07,R*.5,R*.12,start,R*.025);sh.closePath();
+          const geo=new T.ExtrudeGeometry(sh,{depth:H*.4,bevelEnabled:false,curveSegments:18});geo.rotateX(-Math.PI/2);geo.rotateX((p.id==='propeller_cw'?1:-1)*.2);geo.rotateY(i*Math.PI);geo.translate(0,H*.3,0);g.add(new T.Mesh(geo,propMat()));
+        }
+        return g;
+      }
+      case 'battery_pack': {
+        const W=d.width*s,H=d.height*s,D=d.depth*s;
+        return grp(box(W,H,D,0,H/2,0,0x384e47),box(W*.9,H*.025,D*.66,0,H*1.013,0,0xb5bd8b),box(W*.12,H*.3,D*.06,W*.3,H*.65,-D*.53,0xdfb941));
+      }
+      case 'battery_strap': {
+        const W=d.width*s,H=d.height*s,D=d.depth*s,t=d.wallThickness*s;
+        return grp(box(W,t,D,0,t/2,0),box(W,t,D,0,H-t/2,0),box(t,H,D,-W/2+t/2,H/2,0),box(t,H,D,W/2-t/2,H/2,0),box(W*.35,t*2,D*1.15,W*.2,H+t,0,0x8b9c78));
+      }
+      case 'flight_controller':
+      case 'esc_board': {
+        const W=d.width*s,H=d.height*s,th=d.thickness*s,shape=new T.Shape();
+        shape.moveTo(-W/2,-H/2);shape.lineTo(W/2,-H/2);shape.lineTo(W/2,H/2);shape.lineTo(-W/2,H/2);shape.closePath();
+        for(const x of [-W*5/12,W*5/12])for(const z of [-H*5/12,H*5/12]){const h=new T.Path();h.absarc(x,z,Math.min(W,H)*.045,0,Math.PI*2,true);shape.holes.push(h);}
+        const geo=new T.ExtrudeGeometry(shape,{depth:th,bevelEnabled:false,curveSegments:12});geo.rotateX(-Math.PI/2);const g=grp(new T.Mesh(geo,mat()));
+        if(p.id==='flight_controller'){g.add(box(W*.32,th*2.2,H*.32,0,th*2.1,0,0x22282b));g.add(box(W*.28,th*1.4,H*.15,0,th*1.7,-H*.36,0xb4b9b9));}
+        else for(const x of [-W*.2,W*.2])for(const z of [-H*.2,H*.2])g.add(box(W*.25,th*1.7,H*.25,x,th*1.85,z,0x272b2c));
+        for(let i=0;i<6;i++)for(const side of [-1,1])g.add(box(W*.06,th*.3,H*.08,side*W*.45,th*1.15,(i-2.5)*H*.1,0xbfa355));
+        return g;
+      }
       case 'bracket_l':
         return grp(
           box(d.width * s, d.thickness * s, d.height * s, 0, d.thickness * s / 2, 0),
@@ -238,6 +298,22 @@
   }
 
   /* ─── Tab HTML ───────────────────────────────────────────────── */
+  let assemblyStage=6;
+  function assemblyGuide(){return `<section class="droneAssemblyGuide" id="droneAssemblyGuide" hidden aria-label="Drone assembly sequence"><div><span class="eyebrow">QUADCOPTER · ASSEMBLY SEQUENCE</span><h3>Small parts. Complete assembly.</h3><p id="droneStageDescription" role="status"></p></div><div class="droneStepControls"><button id="dronePrevious" aria-label="Previous assembly step">←</button><label for="droneStage" class="srOnly">Assembly step</label><select id="droneStage">${StudioDrone.stages.map(([name],i)=>`<option value="${i+1}">${i+1} / 6 · ${name}</option>`).join('')}</select><button id="droneNext" aria-label="Next assembly step">→</button><button id="droneComplete">Complete drone</button></div><small>Preview only · saved visibility stays unchanged. Exports restore all assembly steps. Custom added parts appear in every step.</small></section>`;}
+  function refreshAssemblyGuide(){
+    const guide=document.getElementById('droneAssemblyGuide');if(!guide)return;
+    guide.hidden=!objects.some(o=>StudioDrone.stage(o.id));
+    const select=document.getElementById('droneStage');if(select)select.value=String(assemblyStage);
+    const info=document.getElementById('droneStageDescription');if(info)info.textContent=StudioDrone.stages[assemblyStage-1][1]+' '+objects.filter(o=>o.obj3d.visible).length+' of '+objects.length+' components visible.';
+    const previous=document.getElementById('dronePrevious'),next=document.getElementById('droneNext');if(previous)previous.disabled=assemblyStage===1;if(next)next.disabled=assemblyStage===6;
+  }
+  function setAssemblyStage(value,frame=true){
+    if(!Number.isInteger(value)||value<1||value>6)return;
+    if(exploded)toggleExplode();assemblyStage=value;
+    objects.forEach(o=>o.obj3d.visible=o.visible&&StudioDrone.stage(o.id)<=value);
+    if(selId&&!objects.find(o=>o.id===selId)?.obj3d.visible)select(null);
+    refreshAssemblyGuide();if(frame)fitAssembly();
+  }
   function tabHTML() {
     const partsPanel = CATALOGUE.map(c => `
       <div class="parts-category">${c.cat}</div>
@@ -251,7 +327,7 @@
       `<button id="${id}" class="${active}" title="${label}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${svgPath}"/></svg> ${label}</button>`;
 
     return `
-<p class="v3dDisclaimer">Editable concept meshes · simplified gears, motors and fasteners. Threads, fits and manufacturing readiness are not validated. Exports: visible parts, mm, Z-up.</p><div class="editor3d" id="editor3d">
+<p class="v3dDisclaimer">Editable concept meshes · simplified gears, motors and fasteners. Threads, fits and manufacturing readiness are not validated. Exports: visible parts, mm, Z-up. <a href="#/templates">Start a quadcopter assembly →</a></p>${assemblyGuide()}<div class="editor3d" id="editor3d">
 
   <!-- Toolbar -->
   <div class="editor3d-toolbar">
@@ -354,6 +430,7 @@
     if(!StudioAssembly.validate(data)){_toast('Invalid assembly values. Correct the edit before saving.');return false;}
     current.assembly3d=data;loadedSignature=JSON.stringify(data);
     const result=persist();
+    refreshAssemblyGuide();
     refreshUndoButtons();
     return result;
   }
@@ -378,7 +455,7 @@
     }
     if(!StudioAssembly.validate(data))throw Error('Invalid 3D assembly. Export the project before recovery.');
     const signature=JSON.stringify(data);
-    if(loadedProjectId===current.id&&loadedSignature===signature)return;
+    if(loadedProjectId===current.id&&loadedSignature===signature){setAssemblyStage(6,false);return;}
     const next=[];
     try{for(const item of data.objects){
       const base=ALL_PARTS.find(p=>p.id===item.partId),def={...structuredClone(base),dims:structuredClone(item.dims),mat:item.material,col:MAT_COLORS[item.material]};
@@ -386,11 +463,11 @@
       const record={id:item.id,name:item.name,def,obj3d,visible:item.visible,wireframe:item.wireframe};applyRecordAppearance(record);next.push(record);
     }}catch(error){next.forEach(o=>disposeObject(o.obj3d));throw error;}
     clearSceneObjects();objects=next;objects.forEach(o=>scene.add(o.obj3d));loadedProjectId=current.id;loadedSignature=signature;
-    select(null);updateEmpty();refreshAsm();refreshBom();
+    select(null);updateEmpty();refreshAsm();refreshBom();refreshAssemblyGuide();
     if(migrated){current.assembly3d=data;persist();_toast('Legacy 3D scene added to the project. Its original browser copy is retained.');}
   }
-  function clearSceneObjects(){loadedProjectId=null;loadedSignature=null;objects.forEach(o=>{scene.remove(o.obj3d);disposeObject(o.obj3d)});objects=[];selId=null;exploded=false;}
-  function assembledView(){if(exploded)toggleExplode();}
+  function clearSceneObjects(){loadedProjectId=null;loadedSignature=null;objects.forEach(o=>{scene.remove(o.obj3d);disposeObject(o.obj3d)});objects=[];selId=null;exploded=false;assemblyStage=6;}
+  function assembledView(){if(exploded)toggleExplode();if(assemblyStage!==6)setAssemblyStage(6,false);}
   function applyRecordAppearance(rec){
     rec.obj3d.visible=rec.visible;
     rec.obj3d.traverse(c=>{if(c.isMesh){c.castShadow=true;c.receiveShadow=true;if(c.material)c.material.wireframe=rec.wireframe;}});
@@ -442,7 +519,7 @@
     renderer.shadowMap.type = T.PCFSoftShadowMap;
     renderer.setClearColor(0x141c18);
     renderer.toneMapping = T.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    renderer.toneMappingExposure = 1.15;
 
     attachCanvas();
 
@@ -454,7 +531,8 @@
     camera.lookAt(0, 0, 0);
 
     // Lights
-    scene.add(new T.AmbientLight(0xd4eade, 0.65));
+    scene.add(new T.AmbientLight(0xd4eade, 0.95));
+    scene.add(new T.HemisphereLight(0xe4f0eb,0x75917d,1.1));
     const sun = new T.DirectionalLight(0xffffff, 1.25);
     sun.position.set(12, 22, 12);
     sun.castShadow = true;
@@ -462,7 +540,7 @@
     ['left', 'right', 'top', 'bottom'].forEach((k, i) => { sun.shadow.camera[k] = [-20, 20, 20, -20][i]; });
     scene.add(sun);
 
-    const fill = new T.DirectionalLight(0x8daea5, 0.45);
+    const fill = new T.DirectionalLight(0x8daea5, 0.75);
     fill.position.set(-10, 6, -10);
     scene.add(fill);
 
@@ -473,7 +551,7 @@
 
     const ground = new T.Mesh(
       new T.PlaneGeometry(80, 80),
-      new T.MeshStandardMaterial({ color: 0x121a15, roughness: 1.0, metalness: 0.0 })
+      new T.MeshStandardMaterial({ color: 0x24372b, roughness: 1.0, metalness: 0.0 })
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.01;
@@ -550,6 +628,7 @@
 
   /* ─── Selection & Picking ────────────────────────────────────── */
   function select(id) {
+    const target=objects.find(o=>o.id===id);if(target?.visible&&!target.obj3d.visible)setAssemblyStage(6,false);
     objects.forEach(o => o.obj3d.traverse(c => {
       if (c.isMesh && c.material?.emissive) c.material.emissive.setHex(0);
     }));
@@ -583,7 +662,7 @@
 
     const meshes = [];
     objects.forEach(o => {
-      if (o.visible) o.obj3d.traverse(c => { if (c.isMesh) meshes.push(c); });
+      if (o.obj3d.visible) o.obj3d.traverse(c => { if (c.isMesh) meshes.push(c); });
     });
     const hits = raycaster.intersectObjects(meshes, false);
     if (hits.length) {
@@ -692,6 +771,7 @@
     });
 
     document.getElementById('insp-hide').onclick = () => {
+      assembledView();
       rec.visible = !rec.visible;
       rec.obj3d.visible = rec.visible;
       document.getElementById('insp-hide').textContent = rec.visible ? '○ Hide' : '● Show';
@@ -717,12 +797,19 @@
       el.innerHTML = `<div style="padding:10px 14px;font-size:10px;color:#3a5045">No parts in scene</div>`;
       return;
     }
-    el.innerHTML = objects.map(o => `
+    const row=o=>`
       <div class="asm-item${o.id === selId ? ' selected' : ''}" data-asm="${esc(o.id)}">
         ${icon(o.def.icon || 'shaft', 12)}
         <button type="button" class="asm-name" data-select-asm="${esc(o.id)}">${esc(o.name)}</button>
         <button class="asm-vis" aria-label="${o.visible?'Hide':'Show'} ${esc(o.name)}" data-vis="${esc(o.id)}">${o.visible ? '●' : '○'}</button>
-      </div>`).join('');
+      </div>`;
+    if(objects.some(o=>StudioDrone.stage(o.id))){
+      const existing=[...el.querySelectorAll('details[data-stage]')],open=new Set(existing.filter(e=>e.open).map(e=>Number(e.dataset.stage)));
+      el.innerHTML=[...StudioDrone.stages.map(([name],i)=>[i+1,name]),[0,'Custom parts']].map(([step,name])=>{
+        const rows=objects.filter(o=>StudioDrone.stage(o.id)===step);if(!rows.length)return '';
+        return `<details class="asm-group" data-stage="${step}" ${(existing.length?open.has(step):step===2)?'open':''}><summary>${step?step+' · ':''}${name}<span>${rows.length}</span></summary>${rows.map(row).join('')}</details>`;
+      }).join('');
+    }else el.innerHTML=objects.map(row).join('');
 
     el.querySelectorAll('[data-asm]').forEach(item => item.onclick = e => {
       if (e.target.closest('[data-vis]')) return;
@@ -732,6 +819,7 @@
     el.querySelectorAll('[data-vis]').forEach(btn => btn.onclick = () => {
       const r = objects.find(o => o.id === btn.dataset.vis);
       if (r) {
+        assembledView();
         r.visible = !r.visible;
         r.obj3d.visible = r.visible;
         refreshAsm();
@@ -869,6 +957,7 @@
   }
 
   function updateEmpty() {
+    refreshAssemblyGuide();
     const el = document.getElementById('v3dEmpty');
     if (el) el.style.display = objects.length ? 'none' : 'flex';
     const cnt = document.getElementById('v3dCount');
@@ -890,6 +979,7 @@
 
   function setCam(view) {
     if (!camera) return;
+    if(objects.some(o=>o.obj3d.visible)&&controls){fitAssembly(view);return;}
     const r = 12;
     if (view === 'top') camera.position.set(0, r, 0.001);
     else if (view === 'front') camera.position.set(0, 0, r);
@@ -904,12 +994,13 @@
     }
   }
 
-  function fitAssembly(){
-    if(!camera||!controls||!objects.some(o=>o.visible))return;
-    const T=window.THREE,bounds=new T.Box3();objects.filter(o=>o.visible).forEach(o=>{o.obj3d.updateMatrixWorld(true);bounds.union(new T.Box3().setFromObject(o.obj3d));});
+  function fitAssembly(view='iso'){
+    if(!camera||!controls||!objects.some(o=>o.obj3d.visible))return;
+    const T=window.THREE,bounds=new T.Box3();objects.filter(o=>o.obj3d.visible).forEach(o=>{o.obj3d.updateMatrixWorld(true);bounds.union(new T.Box3().setFromObject(o.obj3d));});
     const center=bounds.getCenter(new T.Vector3()),size=bounds.getSize(new T.Vector3());
     const distance=Math.max(.5,Math.max(size.x,size.y,size.z)/(2*Math.tan(camera.fov*Math.PI/360))*1.6/Math.min(1,camera.aspect));
-    controls.target.copy(center);camera.position.copy(center).addScaledVector(new T.Vector3(.7,.5,.7).normalize(),distance);if(scene.fog){scene.fog.near=Math.max(90,distance*2);scene.fog.far=Math.max(220,distance*6);}controls.update();
+    const direction=view==='top'?new T.Vector3(0,1,.001):view==='front'?new T.Vector3(0,0,1):new T.Vector3(.7,.65,.7);
+    controls.target.copy(center);camera.position.copy(center).addScaledVector(direction.normalize(),distance);if(scene.fog){scene.fog.near=Math.max(90,distance*2);scene.fog.far=Math.max(220,distance*6);}controls.update();
   }
 
   /* ─── STL & OBJ Exporters ─────────────────────────────────────── */
@@ -991,6 +1082,7 @@
       else if (a === 'del') delSelected();
       else if (a === 'clear') clearAll();
       else if (a === 'hide') {
+        assembledView();
         const r = objects.find(o => o.id === selId);
         if (r) { r.visible = !r.visible; r.obj3d.visible = r.visible; refreshAsm(); renderInsp(); saveScene(); }
       } else if (a === 'wire') {
@@ -1016,6 +1108,8 @@
   /* ─── Event Binding ──────────────────────────────────── */
   function bindEditor() {
     const on = (id, fn) => { const el = document.getElementById(id); if(el)el.onclick=fn; };
+    const stage=document.getElementById('droneStage');if(stage)stage.onchange=e=>setAssemblyStage(Number(e.target.value));
+    on('dronePrevious',()=>setAssemblyStage(assemblyStage-1));on('droneNext',()=>setAssemblyStage(assemblyStage+1));on('droneComplete',()=>setAssemblyStage(6));refreshAssemblyGuide();
 
     // Modes & camera
     on('tb-orbit', () => setMode('orbit'));
@@ -1128,10 +1222,12 @@
     try{
       await ensureThree();
       if(ticket!==entrySequence||project!==current?.id||!isActive())return;
+      const changed=!editorReady||!renderer||loadedProjectId!==current.id;
       if(!editorReady||!renderer)initScene();else attachCanvas();
       loadScene();
       const vp=document.getElementById('vp3d');observeViewport(vp);
       camera.aspect=Math.max(1,vp.clientWidth)/Math.max(1,vp.clientHeight);camera.updateProjectionMatrix();renderer.setSize(Math.max(1,vp.clientWidth),Math.max(1,vp.clientHeight),false);
+      if(changed)fitAssembly();
       bindEditor();setMode(mode);select(selId);refreshBom();updateEmpty();refreshUndoButtons();
       const loading=document.getElementById('v3dLoad');if(loading)loading.style.display='none';
       if(raf===null)loop();

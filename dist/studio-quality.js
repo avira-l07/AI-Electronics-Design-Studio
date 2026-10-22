@@ -6,6 +6,7 @@ function assertLocalProjectWrite(){
   if(localConflict||studioStorage.read('engineering-studio-v1')!==localStorageVersion){localConflict=true;throw Error('Projects changed in another tab. Export your edits before reloading.');}
 }
 function projectPreview(p){
+  if(p.assembly3d?.objects.some(o=>StudioDrone.stage(o.id)))return templateArt('drone');
   if(projectCategory(p)==='sketch'){
     const shapes=(p.sketch||[]);
     return shapes.length?`<svg viewBox="0 0 800 440" aria-hidden="true" fill="none" stroke="currentColor">${sketchShapesMarkup(shapes)}</svg>`:templateArt('sketch');
