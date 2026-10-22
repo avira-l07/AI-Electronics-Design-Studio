@@ -11,8 +11,8 @@ jobs:
         with: {node-version: '22'}
       - run: pip install -r api/requirements.lock
       - run: python -m pytest api/tests -q
-      - run: node tests/calculations.cjs && node tests/templates.cjs && node tests/engineering.cjs
-      - run: node --check dist/studio-tools.js && node --check dist/server-mode.js
+      - run: npm test
+      - run: node --check dist/project-format.js && node --check dist/studio-quality.js && node --check dist/studio-tools.js && node --check dist/server-mode.js
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e

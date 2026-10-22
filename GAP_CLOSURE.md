@@ -1,5 +1,7 @@
 # Gap closure record — 22 October 2026
 
+Follow-up reliability/UI work and current validation are recorded in [QUALITY_REVIEW.md](QUALITY_REVIEW.md).
+
 ## Implemented in the website
 
 - Recoverable project Trash with restore controls in Library and Workspace. Browser-local trash stays on its device. Server trash belongs to the active account profile. There is no irreversible purge button.

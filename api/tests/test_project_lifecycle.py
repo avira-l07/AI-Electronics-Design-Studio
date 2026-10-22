@@ -10,6 +10,12 @@ import pytest
 def sample():return {'name':'Test project','kind':'Mechanical assembly','material':'Steel','stroke':80,'rod':150,'rpm':600,'parts':[],'notes':[],'revisions':[],'designType':'slider-crank','currency':'USD'}
 def create(c):return post(c,'/api/projects',sample()).json()
 
+@pytest.mark.parametrize('change',[{'name':'   '},{'circuit':{'voltage':1e308,'resistance':1e-300,'rating':1}},{'stroke':2**2000}])
+def test_invalid_name_and_non_finite_circuit_result_rejected(change):
+    with pytest.raises(HTTPException) as error:
+        project_data({**sample(),**change})
+    assert error.value.status_code==422
+
 def test_version_checked_updates_and_recoverable_trash(env):
     app,c,g,s=env;verified_user(app);login(c);created=create(c);id=created['id'];assert created['version']==1
     data={**sample(),'version':1,'name':'Updated'}

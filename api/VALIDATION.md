@@ -1,5 +1,7 @@
 # Validation record — 22 October 2026
 
+Latest follow-up: **35 API tests passed**. New cases reject blank project names, non-finite circuit results and integer-overflow inputs. Frontend save/recovery regressions and verification limits are recorded in `../QUALITY_REVIEW.md`.
+
 ## Completed in this workspace
 
 - 25 Python integration/edge-case tests passed against isolated SQLite databases, using real Argon2id, JWTs, cookies, CSRF checks, database queries and actual Stripe webhook signature verification.

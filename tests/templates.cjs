@@ -3,7 +3,8 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const {webcrypto}=require('node:crypto');
 const fakeNode={onclick:null,textContent:'',classList:{add(){},remove(){}},style:{}};
 let storageFails=false;
-const context=vm.createContext({document:{querySelector:()=>fakeNode,addEventListener(){}},localStorage:{getItem:()=>null,setItem:()=>{if(storageFails)throw Error('Storage full')}},structuredClone,crypto:webcrypto,console});
+const context=vm.createContext({document:{querySelector:()=>fakeNode,addEventListener(){}},localStorage:{getItem:()=>null,setItem:()=>{if(storageFails)throw Error('Storage full')}},structuredClone,crypto:webcrypto,console,assertLocalProjectWrite:()=>{}});
+vm.runInContext(fs.readFileSync('dist/project-format.js','utf8'),context);
 vm.runInContext(fs.readFileSync('dist/app.js','utf8').replace(/render\(\);\s*$/,''),context);
 vm.runInContext(fs.readFileSync('dist/advanced.js','utf8').split('render=function()')[0],context);
 const ui=fs.readFileSync('dist/studio-ui.js','utf8');

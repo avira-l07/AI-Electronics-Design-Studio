@@ -1,0 +1,25 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const fake={textContent:'',innerHTML:'',style:{},classList:{add(){},remove(){}}};
+const button={disabled:false};const form={querySelector:()=>button};const dialog={open:false,showModal(){this.open=true},close(){this.open=false}};
+const dom={'#modalForm':form,'#dialog':dialog};
+const c=vm.createContext({document:{querySelector:s=>dom[s]||fake,addEventListener(){}},localStorage:{getItem:()=>null},structuredClone,FormData:class{},setTimeout:()=>1,clearTimeout(){},console});
+vm.runInContext(fs.readFileSync('dist/project-format.js','utf8'),c);
+vm.runInContext(fs.readFileSync('dist/app.js','utf8').replace(/render\(\);\s*$/,''),c);
+const run=s=>vm.runInContext(s,c);
+const tick=()=>new Promise(resolve=>setImmediate(resolve));
+(async()=>{
+ let release,calls=0;c.submit=()=>{calls++;return new Promise(resolve=>release=resolve)};
+ run("modal('Async save','',submit)");const saving=form.onsubmit({preventDefault(){}});assert.equal(button.disabled,true);assert.equal(dialog.open,true);await form.onsubmit({preventDefault(){}});assert.equal(calls,1);release();await saving;assert.equal(dialog.open,false);assert.equal(button.disabled,false);
+ c.submit=async()=>{throw Error('Failed save')};run("modal('Failure','',submit)");await form.onsubmit({preventDefault(){}});assert.equal(dialog.open,true);assert.equal(button.disabled,false);
+ c.submit=()=>false;run("modal('Validation','',submit)");await form.onsubmit({preventDefault(){}});assert.equal(dialog.open,true);
+ const node={textContent:''},requests=[];let complete;
+ const s=vm.createContext({structuredClone,console,server:true,trackProjectChange(){},current:{id:'a',name:'First',version:1},me:{active_profile:'one'},saveBlocked:false,pendingSaves:0,saveQueue:Promise.resolve(),projectVersions:new Map([['a',1]]),studioBackend:{},$:()=>node,status(){},toast(){},showSaveProblem(){},api:async(path,method,data)=>{requests.push({path,method,data});if(requests.length===1)await new Promise(resolve=>complete=resolve);return {version:requests.length+1}}});
+ vm.runInContext('let projects=[current]',s);
+ const src=fs.readFileSync('dist/server-mode.js','utf8');
+ vm.runInContext(src.slice(src.indexOf(' persist=function(){'),src.indexOf(' const previewRender=render;')),s);
+ vm.runInContext("persist();current.name='Second';persist()",s);assert.equal(s.studioBackend.pending,true);await tick();assert.equal(requests.length,1);complete();await s.studioBackend.flush();assert.equal(requests.length,2);assert.equal(requests[0].data.name,'First');assert.equal(requests[1].data.name,'Second');assert.equal(requests[1].data.version,2);assert.equal(s.studioBackend.pending,false);
+ s.api=async()=>{throw Error('Version conflict')};vm.runInContext("current.name='Unsaved';persist();persist()",s);await assert.rejects(s.studioBackend.flush(),/Resolve/);assert.equal(s.studioBackend.saveFailed,true);assert.equal(s.current.name,'Unsaved');assert.equal(s.studioBackend.pending,false);
+ const load=src.split(/\r?\n/).find(line=>line.startsWith(' async function loadProjects()'));
+ vm.runInContext(load,s);await assert.rejects(vm.runInContext('loadProjects()',s),/Resolve/);assert.equal(s.current.name,'Unsaved','a failed save cannot be discarded by library/profile loading');
+ console.log('PASS: async dialog completion/failure/double-submit and serialized, versioned saves with conflict recovery.');
+})().catch(e=>{console.error(e);process.exitCode=1});

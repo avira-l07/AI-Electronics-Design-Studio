@@ -5,9 +5,11 @@ from fastapi import HTTPException
 def project_data(data,depth=0):
     def invalid():raise HTTPException(422,'Invalid engineering project data')
     def string(v,n=1000):return isinstance(v,str) and len(v)<=n
-    def number(v):return type(v) in (int,float) and math.isfinite(v)
+    def number(v):
+        try:return type(v) in (int,float) and math.isfinite(v)
+        except OverflowError:return False
     if not isinstance(data,dict) or depth>1:invalid()
-    if not all(string(data.get(k),200) for k in ['name','material']):invalid()
+    if not all(string(data.get(k),200) for k in ['name','material']) or not data['name'].strip():invalid()
     if not string(data.get('kind',''),100):invalid()
     if data.get('designType','slider-crank') not in ['slider-crank','electronics','sketch']:invalid()
     if data.get('currency','INR') not in ['INR','USD','EUR','GBP','JPY']:invalid()
@@ -31,6 +33,9 @@ def project_data(data,depth=0):
         if k in data:
             if not isinstance(data[k],dict) or any(not number(data[k].get(f)) or data[k][f]<0 for f in fields):invalid()
             if k=='circuit' and any(data[k][f]<=0 for f in fields):invalid()
+            if k=='circuit':
+                current=data[k]['voltage']/data[k]['resistance']
+                if not math.isfinite(current) or not math.isfinite(data[k]['voltage']*current):invalid()
             if k=='costSettings' and (type(data[k]['quantity'])!=int or data[k]['quantity']<1):invalid()
     if 'resistorNetwork' in data:
         net=data['resistorNetwork']

@@ -20,3 +20,33 @@ test('dark theme persists and workspace tabs support arrow keys',async({page})=>
  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');await page.getByRole('link',{name:'Design workspace',exact:true}).click();
  await page.getByRole('tab',{name:'◈ Design',exact:true}).press('ArrowRight');await expect(page.getByRole('tab',{name:'⬡ Assembly',exact:true})).toHaveAttribute('aria-selected','true');
 });
+
+test('an empty library stays empty and offers a starting point',async({page})=>{
+ await page.addInitScript(()=>localStorage.setItem('engineering-studio-v1','[]'));
+ await page.goto('/#/workspace');
+ await expect(page.getByRole('heading',{name:'Start with a question. Make it something you can explore.'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'↗ Export project',exact:true})).toBeDisabled();
+ expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('engineering-studio-v1')))).toEqual([]);
+});
+
+test('corrupt storage remains available for recovery',async({page})=>{
+ await page.addInitScript(()=>localStorage.setItem('engineering-studio-v1','{broken'));
+ await page.goto('/#/dashboard');
+ await expect(page.getByText('Your saved data needs attention',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Backups & recovery →',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Download original saved data',exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>localStorage.getItem('engineering-studio-v1'))).toBe('{broken');
+ await page.getByRole('button',{name:'Recover readable projects',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Project library',exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>Object.keys(localStorage).some(k=>k.startsWith('studio-original-')))).toBe(true);
+});
+
+test('backup copies preserve existing projects and sketch previews',async({page})=>{
+ await page.goto('/#/library');await page.getByRole('button',{name:'Backups',exact:true}).click();
+ const downloadEvent=page.waitForEvent('download');await page.getByRole('button',{name:'Download full backup ↓',exact:true}).click();
+ const file=await(await downloadEvent).path();
+ await page.locator('#restoreStudioBackup').setInputFiles(file);
+ await page.getByRole('button',{name:'Import 1 project copy',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Slider-crank mechanism (restored)',exact:true})).toBeVisible();
+ await expect(page.locator('.studioProject')).toHaveCount(2);
+});

@@ -2,6 +2,8 @@
 
 Browser-local engineering concept workspace. Serve `dist/` using any static HTTP server.
 
+Latest reliability and UI changes: [QUALITY_REVIEW.md](QUALITY_REVIEW.md). Run `npm test` for all JavaScript regressions. Site visibility is managed separately by the owner.
+
 ## Version 0.2
 
 - Parameter-driven 2D slider-crank scene with playback, angle scrubbing, wireframe and SVG export.

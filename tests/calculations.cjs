@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fakeNode = {onclick:null,textContent:'',classList:{add(){},remove(){}},style:{}};
 const context = vm.createContext({document:{querySelector:()=>fakeNode,addEventListener(){}},localStorage:{getItem:()=>null},structuredClone,console});
 const base=fs.readFileSync('dist/app.js','utf8').replace(/render\(\);\s*$/,'');
+vm.runInContext(fs.readFileSync('dist/project-format.js','utf8'),context);
 vm.runInContext(base,context);
 vm.runInContext(fs.readFileSync('dist/advanced.js','utf8').split('render=function()')[0],context);
 const run=code=>vm.runInContext(code,context);
