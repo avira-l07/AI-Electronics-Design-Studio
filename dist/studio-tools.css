@@ -8,3 +8,5 @@
 [data-theme=dark] .tabs .tab{color:#bac9ae}[data-theme=dark] .tabs .tab.active{color:var(--studio-highlight);border-color:var(--studio-accent);background:#31472a}[data-theme=dark] .shapeObjectList button.selected{color:var(--studio-accent)}
 
 [data-theme=dark] .app .field label,[data-theme=dark] .app .tiny,[data-theme=dark] .app footer,[data-theme=dark] .sketchOptions{color:var(--studio-muted)}[data-theme=dark] .segmented{background:var(--studio-soft);border-color:var(--studio-border)}
+
+.saveProblem{border:1px solid #b3844d;background:#fff2df;color:#69451f;margin:0 0 22px}.saveProblem b{font-size:13px}.saveProblem p{font-size:12px}.saveProblem button{font-size:11px}.saveProblem>span{display:block;font-size:11px;margin-top:10px}[data-theme=dark] .saveProblem{background:#423522;border-color:#ae8652;color:#f0d6ad}
