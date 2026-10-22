@@ -9,7 +9,7 @@ def test_complete_drone_persists_through_api(env):
     script="""
 const fs=require('node:fs'),vm=require('node:vm');
 const context=vm.createContext({structuredClone});
-for(const path of ['dist/assembly-data.js','dist/drone-template.js'])vm.runInContext(fs.readFileSync(path,'utf8'),context);
+for(const path of ['dist/solid-model.js','dist/assembly-data.js','dist/drone-template.js'])vm.runInContext(fs.readFileSync(path,'utf8'),context);
 process.stdout.write(vm.runInContext('JSON.stringify(StudioDrone.projectData())',context));
 """
     data=json.loads(subprocess.check_output(['node','-e',script],cwd=root,text=True))

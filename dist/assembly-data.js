@@ -1,6 +1,7 @@
 /* Bounded, portable assembly model. Distances mm; rotations degrees. */
 const StudioAssembly=(()=>{
   const CATALOGUE = [
+    {cat:'Create your own',parts:[{id:'custom_solid',name:'Custom solid',desc:'Draw · extrude · cut · join',icon:'enclosure',dims:{depth:12},model:{version:1,plane:'XZ',outline:[[-40,-25],[40,-25],[40,25],[-40,25]],features:[]},mat:'Aluminium 6061',col:0xa8b8c8}]},
     { cat: 'Drone & Multirotor', parts: [
       {id:'quad_plate',name:'Quadcopter frame plate',desc:'Drilled concept centre plate',icon:'plate',dims:{width:80,height:60,thickness:2.5},mat:'Carbon fibre',col:0x303c40},
       {id:'quad_arm',name:'Quadcopter arm',desc:'Tapered arm with mounting holes',icon:'beam',dims:{width:22,length:113.723,thickness:4},mat:'Carbon fibre',col:0x303c40},
@@ -69,7 +70,8 @@ const StudioAssembly=(()=>{
     if(!object(a)||a.version!==1||a.units!=='mm'||Object.keys(a).some(k=>!['version','units','objects'].includes(k))||!Array.isArray(a.objects)||a.objects.length>200)return false;
     const ids=new Set();
     return a.objects.every(o=>{
-      if(!object(o)||Object.keys(o).some(k=>!['id','partId','name','dims','material','position','rotation','visible','wireframe'].includes(k))||typeof o.id!=='string'||!/^[a-zA-Z0-9_-]{1,80}$/.test(o.id)||ids.has(o.id))return false;
+      if(!object(o)||Object.keys(o).some(k=>!['id','partId','name','dims','material','position','rotation','visible','wireframe','model'].includes(k))||typeof o.id!=='string'||!/^[a-zA-Z0-9_-]{1,80}$/.test(o.id)||ids.has(o.id))return false;
+      if(o.partId==='custom_solid'?!StudioSolidModel.validate(o.model,o.dims?.depth):o.model!==undefined)return false;
       ids.add(o.id);
       return typeof o.name==='string'&&o.name.length>0&&o.name.length<=80&&materials.includes(o.material)&&dimensions(o.partId,o.dims)&&typeof o.visible==='boolean'&&typeof o.wireframe==='boolean'&&Array.isArray(o.position)&&o.position.length===3&&o.position.every(v=>finite(v)&&Math.abs(v)<=100000)&&Array.isArray(o.rotation)&&o.rotation.length===3&&o.rotation.every(v=>finite(v)&&Math.abs(v)<=3600);
     });
@@ -88,9 +90,9 @@ const StudioAssembly=(()=>{
     const groups=new Map();
     for(const o of a.objects){
       const dims=Object.fromEntries(Object.entries(o.dims).sort(([a],[b])=>a.localeCompare(b)));
-      const key=JSON.stringify([o.partId,o.material,dims]);
+      const key=JSON.stringify(o.model?[o.partId,o.material,dims,StudioSolidModel.signature(o.model)]:[o.partId,o.material,dims]);
       const previous=existing.find(p=>p.source3dKey===key);
-      if(!groups.has(key))groups.set(key,{name:(parts.find(p=>p.id===o.partId).name+' · '+Object.entries(dims).map(([k,v])=>k+' '+Number(v.toFixed(3))).join(' / ')).slice(0,200),material:o.material,qty:0,price:previous?.price||0,source3dKey:key});
+      if(!groups.has(key))groups.set(key,{name:((o.model?o.name:parts.find(p=>p.id===o.partId).name)+' · '+Object.entries(dims).map(([k,v])=>k+' '+Number(v.toFixed(3))).join(' / ')).slice(0,200),material:o.material,qty:0,price:previous?.price||0,source3dKey:key});
       groups.get(key).qty++;
     }
     return [...existing.filter(p=>!p.source3dKey),...groups.values()];

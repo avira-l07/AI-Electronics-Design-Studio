@@ -2,6 +2,7 @@
 import json,math,re
 from pathlib import Path
 from fastapi import HTTPException
+from .solid_data import validate_solid
 
 SCHEMA=json.loads(Path(__file__).with_name('assembly_schema.json').read_text())
 def validate_assembly(a):
@@ -13,13 +14,16 @@ def validate_assembly(a):
     ids=set()
     for o in a['objects']:
         fields={'id','partId','name','dims','material','position','rotation','visible','wireframe'}
-        if not isinstance(o,dict) or set(o)!=fields:invalid()
+        if not isinstance(o,dict) or set(o) not in (fields,fields|{'model'}):invalid()
         if not isinstance(o['id'],str) or not re.fullmatch(r'[a-zA-Z0-9_-]{1,80}',o['id']) or o['id'] in ids:invalid()
         ids.add(o['id'])
         if not isinstance(o['name'],str) or not 1<=len(o['name'])<=80 or o['material'] not in SCHEMA['materials'] or type(o['visible'])!=bool or type(o['wireframe'])!=bool:invalid()
         if not isinstance(o['partId'],str) or o['partId'] not in SCHEMA['parts']:invalid()
         d=o['dims']
         if not isinstance(d,dict) or set(d)!=set(SCHEMA['parts'][o['partId']]) or any(not number(v) or v<0.1 for v in d.values()):invalid()
+        if o['partId']=='custom_solid':
+            if not validate_solid(o.get('model'),d['depth']):invalid()
+        elif 'model' in o:invalid()
         if 'teeth' in d and (type(d['teeth'])!=int or not 6<=d['teeth']<=120):invalid()
         if all(k in d for k in ['thickness','width','height']) and d['thickness']>=min(d['width'],d['height'])/2:invalid()
         if 'wallThickness' in d and d['wallThickness']>=min(d['width'],d['height'],d['depth'])/2:invalid()

@@ -3,13 +3,14 @@
   "private": true,
   "scripts": {
     "test:e2e": "playwright test",
-    "test": "node tests/calculations.cjs && node tests/templates.cjs && node tests/engineering.cjs && node tests/resilience.cjs && node tests/save-flows.cjs && node tests/assembly.cjs",
-    "vendor:3d": "node scripts/vendor-three.cjs && node scripts/assembly-schema.cjs"
+    "test": "node tests/calculations.cjs && node tests/templates.cjs && node tests/engineering.cjs && node tests/resilience.cjs && node tests/save-flows.cjs && node tests/assembly.cjs && node tests/solid-model.cjs",
+    "vendor:3d": "node scripts/vendor-three.cjs && node scripts/assembly-schema.cjs && node scripts/vendor-solid.cjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1"
   },
   "dependencies": {
+    "manifold-3d": "3.5.1",
     "three": "0.161.0"
   }
 }

@@ -8,9 +8,10 @@
 
   let libraryPromise;
   async function ensureThree(){
-    if(!libraryPromise)libraryPromise=Promise.all([import('./vendor/three/three.module.js'),import('./vendor/three/OrbitControls.js')]).then(([three,controls])=>{window.THREE={...three,OrbitControls:controls.OrbitControls};}).catch(error=>{libraryPromise=null;throw error});
+    if(!libraryPromise)libraryPromise=Promise.all([import('./vendor/three/three.module.js'),import('./vendor/three/OrbitControls.js'),import('./vendor/three/TransformControls.js')]).then(([three,controls,transforms])=>{window.THREE={...three,OrbitControls:controls.OrbitControls,TransformControls:transforms.TransformControls};}).catch(error=>{libraryPromise=null;throw error});
     return libraryPromise;
   }
+  async function ensureSolids(){await ensureThree();await StudioSolidModel.init();}
 
   /* ─── Helpers ────────────────────────────────────────────────── */
   function _toast(msg) {
@@ -84,6 +85,7 @@
   let mode = 'orbit';        // 'orbit' | 'select'
   let gridHelper = null, raycaster = null, vpObserver = null;
   let editorReady = false;
+  let transformControls=null,dragStart=null,snapTransforms=true;
   let ctxController=null;
   let exploded = false,keyHandler=null,pointerStart=null,dragged=false;
 
@@ -93,6 +95,7 @@
   // Every part has a transform root; mesh offsets stay local to its definition.
   function build(p){
     if(!StudioAssembly.dimensions(p.id,p.dims))throw Error('Invalid dimensions for this part. Check bore, wall thickness and size limits.');
+    if(p.id==='custom_solid'&&!StudioSolidModel.validate(p.model,p.dims.depth))throw Error('Invalid custom solid recipe.');
     const root=new window.THREE.Group();root.add(buildGeometry(p));return root;
   }
   function ring(outer,inner,length,mat,sides=48){
@@ -127,6 +130,7 @@
     const s = 0.1; // 1 mm = 0.1 scene unit (1 unit = 10 mm)
 
     switch (p.id) {
+      case 'custom_solid':return new T.Mesh(StudioSolidModel.geometry(T,p.model,d.depth),mat());
       case 'quad_plate': {
         const W=d.width*s,H=d.height*s,shape=new T.Shape();
         shape.moveTo(-W/2,-H/2);shape.lineTo(W/2,-H/2);shape.lineTo(W/2,H/2);shape.lineTo(-W/2,H/2);shape.closePath();
@@ -327,7 +331,7 @@
       `<button id="${id}" class="${active}" title="${label}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${svgPath}"/></svg> ${label}</button>`;
 
     return `
-<p class="v3dDisclaimer">Editable concept meshes · simplified gears, motors and fasteners. Threads, fits and manufacturing readiness are not validated. Exports: visible parts, mm, Z-up. <a href="#/templates">Start a quadcopter assembly →</a></p>${assemblyGuide()}<div class="editor3d" id="editor3d">
+<div class="v3dCreateBar"><button class="primary" id="startCustomSolid">＋ Draw your own 3D part</button><span>Profile → extrude → cut / join → edit → save</span><a href="#/templates">Browse assembly starters →</a></div><p class="v3dDisclaimer">Custom solids retain editable modelling recipes. Catalogue parts remain simplified concept meshes. Exports: visible parts, mm, Z-up; physical fits and manufacturing readiness require review.</p>${assemblyGuide()}<div class="editor3d" id="editor3d">
 
   <!-- Toolbar -->
   <div class="editor3d-toolbar">
@@ -337,7 +341,7 @@
     ${tbBtn('tb-front','Front','M3 3h18v18H3zM3 12h18M12 3v18')}
     ${tbBtn('tb-iso','Iso','M2 16 12 4l10 12M2 16l10 4 10-4M12 4v16')}<button id="tb-fit" title="Frame all visible parts">Fit assembly</button>
     <div class="tb-sep"></div>
-    <span class="tb-label">TOOLS</span>
+    <span class="tb-label">TOOLS</span><button id="tb-model">＋ Create solid</button><button id="tb-edit-model">Edit solid</button><button id="tb-move">Move</button><button id="tb-rotate">Rotate</button><label class="tbSnap"><input id="tb-snap" type="checkbox" ${snapTransforms?'checked':''}> Snap 1 mm / 15°</label>
     ${tbBtn('tb-select','Select','m4 4 7 18 3-7 7-3z')}
     ${tbBtn('tb-explode','Explode','M5 9 2 12l3 3M19 9l3 3-3 3M9 5l3-3 3 3M9 19l3 3 3-3')}
     ${tbBtn('tb-wireframe','Wireframe','M2 16 12 4l10 12M2 16l10 4 10-4M12 4v16')}
@@ -422,7 +426,7 @@
   }
 
   /* ─── Scene Persistence Per Project ──────────────────────────── */
-  function sceneData(){return {version:1,units:'mm',objects:objects.map(o=>({id:o.id,partId:o.def.id,name:o.name,dims:structuredClone(o.def.dims),material:o.def.mat,position:(o._prePos&&exploded?o._prePos:o.obj3d.position).toArray().map(v=>v*10),rotation:[o.obj3d.rotation.x,o.obj3d.rotation.y,o.obj3d.rotation.z].map(v=>v*180/Math.PI),visible:o.visible,wireframe:o.wireframe}))};}
+  function sceneData(){return {version:1,units:'mm',objects:objects.map(o=>({id:o.id,partId:o.def.id,name:o.name,dims:structuredClone(o.def.dims),...(o.def.model?{model:structuredClone(o.def.model)}:{}),material:o.def.mat,position:(o._prePos&&exploded?o._prePos:o.obj3d.position).toArray().map(v=>v*10),rotation:[o.obj3d.rotation.x,o.obj3d.rotation.y,o.obj3d.rotation.z].map(v=>v*180/Math.PI),visible:o.visible,wireframe:o.wireframe}))};}
   let loadedProjectId=null,loadedSignature=null,entrySequence=0,sceneBlocked=false;
   function saveScene(){
     if(sceneBlocked||!current?.id||current.id!==loadedProjectId)return false;
@@ -458,7 +462,7 @@
     if(loadedProjectId===current.id&&loadedSignature===signature){setAssemblyStage(6,false);return;}
     const next=[];
     try{for(const item of data.objects){
-      const base=ALL_PARTS.find(p=>p.id===item.partId),def={...structuredClone(base),dims:structuredClone(item.dims),mat:item.material,col:MAT_COLORS[item.material]};
+      const base=ALL_PARTS.find(p=>p.id===item.partId),def={...structuredClone(base),dims:structuredClone(item.dims),...(item.model?{model:structuredClone(item.model)}:{}),mat:item.material,col:MAT_COLORS[item.material]};
       const obj3d=build(def);obj3d.position.fromArray(item.position.map(v=>v/10));obj3d.rotation.set(...item.rotation.map(v=>v*Math.PI/180));
       const record={id:item.id,name:item.name,def,obj3d,visible:item.visible,wireframe:item.wireframe};applyRecordAppearance(record);next.push(record);
     }}catch(error){next.forEach(o=>disposeObject(o.obj3d));throw error;}
@@ -505,7 +509,7 @@
 
   /* ─── Scene Initialization ───────────────────────────────────── */
   function initScene() {
-    if(renderer){controls?.dispose();renderer.dispose();vpObserver?.disconnect();}
+    if(renderer){controls?.dispose();transformControls?.dispose();renderer.dispose();vpObserver?.disconnect();}
     renderer=null;controls=null;clearSceneObjectsSafe();
     const T = window.THREE;
     const vp = document.getElementById('vp3d');
@@ -562,6 +566,10 @@
 
     controls = new T.OrbitControls(camera, renderer.domElement);
     controls.minDistance=.5;controls.maxDistance=50000;controls.maxPolarAngle=Math.PI*.95;
+    transformControls=new T.TransformControls(camera,renderer.domElement);transformControls.setSize(.8);scene.add(transformControls);
+    transformControls.addEventListener('mouseDown',()=>{const rec=objects.find(o=>o.id===selId);if(rec)dragStart={id:rec.id,position:rec.obj3d.position.clone(),rotation:rec.obj3d.rotation.clone()};});
+    transformControls.addEventListener('dragging-changed',e=>{controls.enabled=!e.value&&mode==='orbit';});
+    transformControls.addEventListener('mouseUp',()=>{const rec=objects.find(o=>o.id===dragStart?.id);if(!rec)return;const position=rec.obj3d.position.toArray(),rotation=[rec.obj3d.rotation.x,rec.obj3d.rotation.y,rec.obj3d.rotation.z];if(position.some(v=>!Number.isFinite(v)||Math.abs(v)>10000)||rotation.some(v=>!Number.isFinite(v)||Math.abs(v)>Math.PI*20)){rec.obj3d.position.copy(dragStart.position);rec.obj3d.rotation.copy(dragStart.rotation);_toast('Transform exceeds the supported position or rotation limits.');}else saveScene();dragStart=null;renderInsp();});
     renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();editorReady=false;pauseEditor();const load=document.getElementById('v3dLoad');if(load){load.style.display='flex';load.textContent='Graphics context lost. Waiting for the browser to restore it…';}});
     renderer.domElement.addEventListener('webglcontextrestored',()=>{editorReady=true;if(isActive())enterEditor();});
     raycaster = new T.Raycaster();
@@ -587,7 +595,24 @@
   }
 
   /* ─── Object Placement ───────────────────────────────────────── */
+  async function modelPart(id){
+    if(sceneBlocked||!editorReady||current?.id!==loadedProjectId)return _toast('Open a project in the 3D editor first.');
+    const rec=id?objects.find(o=>o.id===id):null,project=current.id;
+    if(id&&!rec?.def.model)return _toast('Select a custom solid to edit its profile and features.');
+    if(!rec&&objects.length>=200)return _toast('Assemblies support up to 200 parts.');
+    try{await ensureSolids();if(current.id!==project||!isActive())return;
+      StudioSolidEditor.open({model:rec?.def.model,depth:rec?.def.dims.depth,name:rec?.name,onCommit:draft=>{
+        if(current.id!==project||sceneBlocked)throw Error('The active project changed. Reopen the modeller.');
+        const def={...structuredClone(rec?.def||ALL_PARTS.find(p=>p.id==='custom_solid')),model:draft.model,dims:{depth:draft.depth}},obj3d=build(def);
+        assembledView();
+        if(rec){obj3d.position.copy(rec.obj3d.position);obj3d.rotation.copy(rec.obj3d.rotation);scene.remove(rec.obj3d);disposeObject(rec.obj3d);rec.obj3d=obj3d;rec.def=def;rec.name=draft.name;applyRecordAppearance(rec);scene.add(obj3d);select(rec.id);}
+        else{const T=window.THREE,bounds=new T.Box3().setFromObject(obj3d);obj3d.position.y=-bounds.min.y;if(objects.length){const occupied=new T.Box3();objects.forEach(o=>occupied.union(new T.Box3().setFromObject(o.obj3d)));obj3d.position.x=occupied.max.x-bounds.min.x+1;}const record={id:uid(),name:draft.name,def,obj3d,visible:true,wireframe:false};applyRecordAppearance(record);objects.push(record);scene.add(obj3d);select(record.id);}
+        updateEmpty();refreshAsm();refreshBom();saveScene();fitAssembly();_toast('Custom solid saved with editable profile and feature history.');
+      }});
+    }catch(e){_toast(e.message);}
+  }
   function place(partId) {
+    if(partId==='custom_solid')return modelPart();
     if(sceneBlocked||!editorReady)return _toast('Resolve the 3D loading error first.');
     if(objects.length>=200)return _toast('Assemblies support up to 200 parts.');
     assembledView();
@@ -649,10 +674,17 @@
     }
     refreshAsm();
     renderInsp();
+    syncTransformHandles();
+  }
+  function syncTransformHandles(){
+    if(!transformControls)return;
+    const rec=objects.find(o=>o.id===selId),active=['move','rotate'].includes(mode)&&!!rec?.obj3d.visible&&!exploded;
+    transformControls.enabled=active;transformControls.setTranslationSnap(snapTransforms?0.1:null);transformControls.setRotationSnap(snapTransforms?Math.PI/12:null);
+    if(active){transformControls.setMode(mode==='move'?'translate':'rotate');transformControls.attach(rec.obj3d);}else transformControls.detach();
   }
 
   function pick(e) {
-    if (mode !== 'select' || !raycaster || !camera) return;
+    if(mode==='orbit'||transformControls?.dragging||['move','rotate'].includes(mode)&&transformControls?.axis||!raycaster||!camera)return;
     const canvas = document.getElementById('v3dCanvas');
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -703,6 +735,7 @@
       <div class="inspector-section"><h4>Dimensions · mm</h4>
         <div class="dim-grid">${dimRows}</div>
         <button class="dim-apply" id="applyDims">↻ Rebuild geometry</button>
+        ${rec.def.model?'<button class="dim-apply" id="insp-model">Edit profile & features</button>':''}
       </div>
       <div class="inspector-section"><h4>Position · mm</h4>
         <div class="dim-grid">
@@ -731,6 +764,7 @@
   }
 
   function bindInsp(rec) {
+    const modelButton=document.getElementById('insp-model');if(modelButton)modelButton.onclick=()=>modelPart(rec.id);
     document.getElementById('insp-name').onchange = e => {
       rec.name = e.target.value.trim().slice(0, 80) || rec.name;
       refreshAsm();
@@ -738,10 +772,11 @@
       saveScene();
     };
 
-    document.getElementById('applyDims').onclick=()=>{
+    document.getElementById('applyDims').onclick=async()=>{
+      const projectId=current.id;
       const dims=Object.fromEntries(Object.keys(rec.def.dims).map(k=>[k,Number(document.getElementById('dim_'+k).value)]));
       if(!StudioAssembly.dimensions(rec.def.id,dims)){_toast('Use valid finite dimensions, whole teeth (6–120), and bores/walls that fit inside the part.');return;}
-      assembledView();const nextDef={...rec.def,dims};const replacement=build(nextDef);replacement.position.copy(rec.obj3d.position);replacement.rotation.copy(rec.obj3d.rotation);
+      assembledView();const nextDef={...rec.def,dims};let replacement;try{if(nextDef.model)await StudioSolidModel.prepare(nextDef.model,dims.depth);if(current.id!==projectId||!objects.includes(rec)||!isActive())return;replacement=build(nextDef)}catch(e){_toast(e.message);return;}replacement.position.copy(rec.obj3d.position);replacement.rotation.copy(rec.obj3d.rotation);
       scene.remove(rec.obj3d);disposeObject(rec.obj3d);rec.def=nextDef;rec.obj3d=replacement;applyRecordAppearance(rec);scene.add(replacement);select(rec.id);refreshBom();saveScene();_toast('Dimensions rebuilt');
     };
 
@@ -933,7 +968,7 @@
         o.obj3d.position.copy(o._prePos);
       }
     });
-    renderInsp();_toast(exploded?'Exploded view · display only; export uses assembled positions':'Assembled view restored');
+    syncTransformHandles();renderInsp();_toast(exploded?'Exploded view · display only; export uses assembled positions':'Assembled view restored');
   }
 
   function clearAll() {
@@ -969,12 +1004,12 @@
   }
 
   function setMode(m) {
+    if(['move','rotate'].includes(m))assembledView();
     mode = m;
     if (controls) controls.enabled = (m === 'orbit');
     const modeEl = document.getElementById('v3dModeLabel');
     if (modeEl) modeEl.textContent = '● ' + m.toUpperCase();
-    ['tb-orbit', 'tb-select'].forEach(id => document.getElementById(id)?.classList.remove('active'));
-    document.getElementById(m === 'orbit' ? 'tb-orbit' : 'tb-select')?.classList.add('active');
+    ['tb-orbit','tb-select','tb-move','tb-rotate'].forEach(id=>document.getElementById(id)?.classList.toggle('active',id==='tb-'+m));syncTransformHandles();
   }
 
   function setCam(view) {
@@ -1108,6 +1143,8 @@
   /* ─── Event Binding ──────────────────────────────────── */
   function bindEditor() {
     const on = (id, fn) => { const el = document.getElementById(id); if(el)el.onclick=fn; };
+    on('tb-model',()=>modelPart());on('startCustomSolid',()=>modelPart());on('tb-edit-model',()=>selId?modelPart(selId):_toast('Select a custom solid first.'));
+    on('tb-move',()=>setMode('move'));on('tb-rotate',()=>setMode('rotate'));const snap=document.getElementById('tb-snap');if(snap)snap.onchange=e=>{snapTransforms=e.target.checked;syncTransformHandles()};
     const stage=document.getElementById('droneStage');if(stage)stage.onchange=e=>setAssemblyStage(Number(e.target.value));
     on('dronePrevious',()=>setAssemblyStage(assemblyStage-1));on('droneNext',()=>setAssemblyStage(assemblyStage+1));on('droneComplete',()=>setAssemblyStage(6));refreshAssemblyGuide();
 
@@ -1215,12 +1252,13 @@
 
   /* ─── Enter / Re-enter Tab ───────────────────────────────────── */
   function clearSceneObjectsSafe(){if(scene)clearSceneObjects();}
-  function pauseEditor(){if(raf!==null){cancelAnimationFrame(raf);raf=null;}vpObserver?.disconnect();if(controls)controls.enabled=false;document.getElementById('v3dCtx')?.remove();ctxController?.abort();}
+  function pauseEditor(){if(raf!==null){cancelAnimationFrame(raf);raf=null;}vpObserver?.disconnect();if(controls)controls.enabled=false;if(transformControls)transformControls.enabled=false;document.getElementById('v3dCtx')?.remove();ctxController?.abort();}
   function isActive(){return page==='3d'&&!document.body.classList.contains('productMode')&&!!document.getElementById('vp3d')?.isConnected&&projects.length>0;}
   async function enterEditor(){
     const ticket=++entrySequence,project=current?.id;
     try{
       await ensureThree();
+      if(current.assembly3d?.objects.some(o=>o.partId==='custom_solid')){await ensureSolids();for(const part of current.assembly3d.objects)if(part.model)await StudioSolidModel.prepare(part.model,part.dims.depth);}
       if(ticket!==entrySequence||project!==current?.id||!isActive())return;
       const changed=!editorReady||!renderer||loadedProjectId!==current.id;
       if(!editorReady||!renderer)initScene();else attachCanvas();

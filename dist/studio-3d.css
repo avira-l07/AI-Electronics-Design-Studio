@@ -116,3 +116,6 @@
 
 .studio3dActive .app #editControls{display:none}.studio3dActive .app .intro{margin-bottom:14px}.studio3dActive .app .intro h1{font-size:28px;margin:6px 0}.studio3dActive .app #subtitle{display:none}.droneAssemblyGuide>div:first-child{flex:1;min-width:230px}.droneAssemblyGuide h3{font-size:17px}.droneStepControls{flex:0 1 auto}.droneAssemblyGuide{padding:14px 18px;gap:10px}.droneAssemblyGuide .eyebrow{font-size:9px}
 .editor3d .asm-group summary{padding:12px 14px;color:#bdd5c5;font-size:11px;cursor:pointer;background:#1b2e24;border-bottom:1px solid #3a5141}.editor3d .asm-group summary span{float:right;color:#9fbeaa}.editor3d .asm-group summary:focus-visible{outline:2px solid #b9e699;outline-offset:-2px}
+
+.v3dCreateBar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 12px}.v3dCreateBar span,.v3dCreateBar a{font-size:12px;color:var(--studio-muted,#abc5b0)}.v3dCreateBar a{margin-left:auto;text-decoration:underline}.v3dCreateBar button{min-height:42px}
+.editor3d .tbSnap{display:flex;align-items:center;gap:6px;color:#c3d9cb;font-size:10px;white-space:nowrap}.editor3d .tbSnap input{width:16px;height:16px;accent-color:#abd18c}

@@ -6,6 +6,8 @@ function assertLocalProjectWrite(){
   if(localConflict||studioStorage.read('engineering-studio-v1')!==localStorageVersion){localConflict=true;throw Error('Projects changed in another tab. Export your edits before reloading.');}
 }
 function projectPreview(p){
+  const solid=p.assembly3d?.objects.find(o=>o.model);if(solid){const points=solid.model.outline,x=points.map(p=>p[0]),y=points.map(p=>-p[1]),left=Math.min(...x)-10,top=Math.min(...y)-10,width=Math.max(...x)-left+10,height=Math.max(...y)-top+10;return `<svg viewBox="${left} ${top} ${width} ${height}" aria-hidden="true"><polygon points="${points.map(([u,v])=>u+','+-v).join(' ')}" fill="currentColor" fill-opacity=".12" stroke="currentColor" stroke-width=".8"/>${solid.model.features.filter(f=>f.enabled&&f.through&&f.shape==='cylinder').map(f=>`<circle cx="${f.position[0]}" cy="${-f.position[1]}" r="${f.dims.diameter/2}" fill="none" stroke="currentColor" stroke-width=".6"/>`).join('')}</svg>`;}
+
   if(p.assembly3d?.objects.some(o=>StudioDrone.stage(o.id)))return templateArt('drone');
   if(projectCategory(p)==='sketch'){
     const shapes=(p.sketch||[]);

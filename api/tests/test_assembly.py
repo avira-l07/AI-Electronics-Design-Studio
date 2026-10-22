@@ -38,6 +38,8 @@ def test_invalid_assembly_rejected(case):
 def test_all_catalogue_defaults_valid_and_bom_key_retained():
     from api.assembly_data import SCHEMA
     for id,dims in SCHEMA['parts'].items():
-        a=assembly();a['objects'][0].update(partId=id,dims=dims);validate_assembly(a)
+        a=assembly();a['objects'][0].update(partId=id,dims=dims)
+        if id=='custom_solid':a['objects'][0]['model']={'version':1,'plane':'XZ','outline':[[0,0],[20,0],[20,20],[0,20]],'features':[]}
+        validate_assembly(a)
     p=project();p['parts']=[{'name':'Bearing','material':'Steel','qty':1,'price':100,'source3dKey':'bounded-key'}]
     assert json.loads(project_data(p))['parts'][0]['source3dKey']=='bounded-key'

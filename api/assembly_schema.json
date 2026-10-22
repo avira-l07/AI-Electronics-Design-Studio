@@ -9,6 +9,9 @@
     "Carbon fibre"
   ],
   "parts": {
+    "custom_solid": {
+      "depth": 12
+    },
     "quad_plate": {
       "width": 80,
       "height": 60,

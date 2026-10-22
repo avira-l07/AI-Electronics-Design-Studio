@@ -68,6 +68,7 @@ def create_app(settings=None,gateway=None):
         response=await call_next(request)
         response.headers['X-Content-Type-Options']='nosniff';response.headers['X-Frame-Options']='DENY';response.headers['Referrer-Policy']='no-referrer';response.headers['Permissions-Policy']='camera=(), microphone=(), geolocation=()'
         response.headers['Content-Security-Policy']="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+        if request.url.path=='/solid-worker.js':response.headers['Content-Security-Policy']="default-src 'none'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; connect-src 'self'"
         if s.secure_cookies:response.headers['Strict-Transport-Security']='max-age=31536000; includeSubDomains'
         if request.url.path.startswith('/api/'):response.headers['Cache-Control']='no-store'
         return response

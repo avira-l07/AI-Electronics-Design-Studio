@@ -1,3 +1,5 @@
+Custom modelling follow-up: **66 API tests passed** on 23 October 2026. See `../V9_MODELLING_REVIEW.md` for the current scope and verification boundaries.
+
 # Validation record — 22 October 2026
 
 Latest follow-up: **35 API tests passed**. New cases reject blank project names, non-finite circuit results and integer-overflow inputs. Frontend save/recovery regressions and verification limits are recorded in `../QUALITY_REVIEW.md`.
