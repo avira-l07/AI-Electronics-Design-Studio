@@ -7,6 +7,7 @@
 | Existing custom 3D modelling, part catalogue and drone concept | Included | Included |
 | Extrude/cut/union, revolve/taper/twist, mirror/pattern, nonlinear point/segment constraints and saved analytic curve definitions | Included | Included |
 | Profile fillets/chamfers, extrusion shells, parallel sweeps, convex lofts, face-plane snapshots | Included within documented modelling limits | Included |
+| Guided face attachment, drag-and-snap, pre-insertion size previews, expanded workspace and isolation | Included | Included |
 | Multi-select/groups, alignment, measurements and simple joints | Included | Included |
 | STL/OBJ import/export and personal parts library | Included within existing mesh limits | Same mesh limits |
 | Mesh inspection, density-based mass/centre of mass estimates and inspection JSON | Included | Included |

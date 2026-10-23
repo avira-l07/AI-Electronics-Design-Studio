@@ -1,6 +1,8 @@
 # AI Engineering Design Studio
 
-Current v12: [delivery audit](V12_AUDIT.md), [current checklist](PRIORITY_CHECKLIST.md) and [Free/Pro split](FREE_AND_PRO.md). Adds shared 3D presence/object merging, analytic curve recipes, nonlinear point/segment constraints, face-plane snapshots, bounded shell/sweep/loft/corner operations, manufacturing review tools and expanded analytical models. 52 browser cases and 108 API tests passed; 14 export files passed independent parsing. Cloud deployment is held; real devices, external CAD/slicers and physical acceptance remain unverified.
+Current v13 usability: [review and workflow](V13_USABILITY_REVIEW.md). Adds drag-and-snap and guided face attachment, actual part thumbnails, pre-insertion size/material previews, direct canvas selection, an expanded workspace and faster access to customization. All new local tools remain Free.
+
+Previous v12 engineering milestone: [delivery audit](V12_AUDIT.md), [current checklist](PRIORITY_CHECKLIST.md) and [Free/Pro split](FREE_AND_PRO.md). Adds shared 3D presence/object merging, analytic curve recipes, nonlinear point/segment constraints, face-plane snapshots, bounded shell/sweep/loft/corner operations, manufacturing review tools and expanded analytical models. 52 browser cases and 108 API tests passed; 14 export files passed independent parsing. Cloud deployment is held; real devices, external CAD/slicers and physical acceptance remain unverified.
 
 Historical milestone notes below describe their original scope; V12_AUDIT.md is the current status.
 

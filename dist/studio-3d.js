@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   Studio 3D Editor  –  Three.js visual workspace  (v8.0)
+   Studio 3D Editor – guided assembly and customization (v13.0)
    Parts library · Dimension inspector · Assembly tools · STL/OBJ export
    Procedural geometry — no external mesh files required.
    ═══════════════════════════════════════════════════════════════ */
@@ -83,7 +83,8 @@
   let objects = [];          // placed scene objects
   let selId = null;          // selected id
   let selectedIds=new Set(),assemblyGroups=[],assemblyJoints=[],multiPivot=null,measurePoints=[],measureMode=false,measureLine=null;
-  let facePicking=false;
+  let facePicking=false,attachment=null,attachmentGhost=null,attachmentMarkers=null,attachmentGhosts=new Map(),skipPick=false,isolationIds=null,dragPlane=null,dragGrab=null,dragThrottle=0,focusMode=false;
+  const thumbnailCache=new Map();let thumbnailTicket=0;
   let mode = 'orbit';        // 'orbit' | 'select'
   let gridHelper = null, raycaster = null, vpObserver = null;
   let editorReady = false;
@@ -325,18 +326,18 @@
   }
   function tabHTML() {
     const partsPanel = CATALOGUE.map(c => `
-      <div class="parts-category">${c.cat}</div>
+      <div class="catalogueCategory" data-part-category="${c.cat}"><div class="parts-category">${c.cat}</div>
       ${c.parts.map(p => `
-        <button type="button" class="part-item" data-insert="${p.id}" title="${p.name} · ${p.desc}">
+        <div class="catalogueCard"><button type="button" class="part-item" draggable="${p.id!=='custom_solid'}" data-insert="${p.id}" title="${p.name} · ${p.desc}">
           <div class="part-icon" style="color:${hex(p.col)}">${icon(p.icon)}</div>
           <div class="part-item-info"><strong>${p.name}</strong><small>${p.desc}</small></div>
-        </button>`).join('')}`).join('');
+        </button><button class="partPreviewButton" type="button" data-preview-part="${p.id}" aria-label="Preview and customize ${p.name}">Preview & size</button></div>`).join('')}</div>`).join('');
 
     const tbBtn = (id, label, svgPath, active = '') =>
       `<button id="${id}" class="${active}" title="${label}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${svgPath}"/></svg> ${label}</button>`;
 
     return `
-<div class="v3dCreateBar"><button class="primary" id="startCustomSolid">＋ Draw your own 3D part</button><button id="openMeshImport">Import STL / OBJ</button><button id="openPersonalParts">My reusable parts</button><button id="inspectManufacturing">Inspect & mass</button><button id="manufacturingTools">Fit & mesh tools</button><button id="faceWorkPlane">Model on a face</button><button id="engineeringLab">Calculation lab</button><button id="projectServices">AI & team</button><a href="#/templates">Browse assembly starters →</a></div><p class="v3dDisclaimer">Custom solids retain editable modelling recipes. Catalogue and imported parts are concept meshes. Reference exports: visible parts, mm, Z-up. Use Inspect & mass for topology checks and density-based estimates; external manufacturing review is still required.</p>${assemblyGuide()}<div class="editor3d" id="editor3d">
+<div class="v3dCreateBar"><button id="workspaceFocus">Expand workspace ↗</button><button class="primary" id="startCustomSolid">＋ Draw your own 3D part</button><button id="openMeshImport">Import STL / OBJ</button><button id="openPersonalParts">My reusable parts</button><button id="inspectManufacturing">Inspect & mass</button><button id="manufacturingTools">Fit & mesh tools</button><button id="faceWorkPlane">Model on a face</button><button id="engineeringLab">Calculation lab</button><button id="projectServices">AI & team</button><a href="#/templates">Browse assembly starters →</a></div><p class="v3dDisclaimer">Custom solids retain editable modelling recipes. Catalogue and imported parts are concept meshes. Reference exports: visible parts, mm, Z-up. Use Inspect & mass for topology checks and density-based estimates; external manufacturing review is still required.</p>${assemblyGuide()}<div class="editor3d" id="editor3d" data-mobile-panel="parts">
 
   <!-- Toolbar -->
   <div class="editor3d-toolbar">
@@ -364,14 +365,16 @@
     <div class="tb-coords" id="v3dCoords">X — · Y — · Z — mm</div>
   </div>
 
+  <div class="assemblyCoach" id="assemblyCoach"><div class="assemblyCoachActions"><button id="attachFaces">Attach faces</button><button id="dragSnap">Drag & snap</button><button id="focusSelected">Focus selected</button><button id="isolateSelected">Isolate selected</button><button id="showAllParts">Show all</button><button id="leaveWorkspaceFocus" hidden>Exit expanded view</button></div><p id="assemblyHint" role="status">Click a part to edit it. Drag empty space to orbit. Use Attach faces or Drag & snap to connect parts.</p><div id="attachmentOptions" hidden><label><input id="attachmentCentres" type="checkbox" checked> Use face centres</label><label>Gap mm<input id="attachmentGap" type="number" value="0" min="-1000" max="1000" step="0.1"></label><label>Turn °<input id="attachmentSpin" type="number" value="0" min="-3600" max="3600" step="15"></label><label><input id="attachmentAlign" type="checkbox" checked> Align faces</label><label><input id="attachmentLock" type="checkbox" checked> Keep attached</label><button id="applyAttachment" disabled>Attach now</button><button id="retryAttachment">Pick again</button><button id="cancelAttachment">Cancel</button></div></div>
+  <div class="mobileWorkspacePanels"><button data-workspace-panel="parts">Parts library</button><button data-workspace-panel="edit">Edit & assembly</button></div>
   <!-- Parts library -->
   <div class="editor3d-parts">
     <div class="editor3d-parts-head">
       <span>CONCEPT PARTS LIBRARY</span>
       <span style="color:#5a8a68">${ALL_PARTS.length} parts</span>
     </div>
-    <input aria-label="Search 3D parts" class="parts-search" id="partsSearch" placeholder="Filter library…" autocomplete="off">
-    <div id="partsList">${partsPanel}</div>
+    <label class="partsCategoryLabel" for="partsCategory">Category</label><select id="partsCategory"><option value="all">All parts</option>${CATALOGUE.map(c=>`<option>${c.cat}</option>`).join('')}</select><input aria-label="Search 3D parts" class="parts-search" id="partsSearch" placeholder="Filter library…" autocomplete="off">
+    <p id="partsFilterCount" role="status">${ALL_PARTS.length} parts · click to add, or preview first</p><div id="partsList">${partsPanel}</div><p id="noPartsFound" hidden>No matching parts. Try another category or search.</p>
   </div>
 
   <!-- Three.js viewport -->
@@ -408,12 +411,12 @@
   </div>
 
   <!-- Inspector -->
-  <div class="editor3d-inspector">
-    <div class="inspector-head">ASSEMBLY TREE</div>
+  <div class="editor3d-inspector"><div class="inspectorJump"><button id="jumpCustomize">Customize</button><button id="jumpAssembly">Assembly list</button></div>
+    <div class="inspector-head">CUSTOMIZE SELECTED PART</div>
+    <div id="insp3d"><div class="inspector-none">Click a visible part to edit dimensions. Preview & size lets you customize a library part before adding it.</div></div>
+    <div class="inspector-head">ASSEMBLY TREE</div><label class="assemblySearchLabel">Find in assembly<input id="assemblySearch" type="search" placeholder="Search placed parts…"></label>
     <div class="assembly-list" id="asmList"></div>
     <div id="assemblyTools"></div>
-    <div class="inspector-head">INSPECTOR</div>
-    <div id="insp3d"><div class="inspector-none">Select an object to inspect its dimensions, position and material.</div></div>
 
     <div class="asm-bom">
       <h4>Quick BOM</h4>
@@ -434,6 +437,7 @@
   function sceneData(){return {version:1,units:'mm',...(assemblyGroups.length?{groups:structuredClone(assemblyGroups)}:{}),...(assemblyJoints.length?{joints:structuredClone(assemblyJoints)}:{}),objects:objects.map(o=>({id:o.id,partId:o.def.id,name:o.name,dims:structuredClone(o.def.dims),...(o.def.model?{model:structuredClone(o.def.model)}:{}),...(o.def.mesh?{mesh:structuredClone(o.def.mesh)}:{}),material:o.def.mat,position:(o._prePos&&exploded?o._prePos:o.obj3d.position).toArray().map(v=>v*10),rotation:[o.obj3d.rotation.x,o.obj3d.rotation.y,o.obj3d.rotation.z].map(v=>v*180/Math.PI),visible:o.visible,wireframe:o.wireframe}))};}
   let loadedProjectId=null,loadedSignature=null,entrySequence=0,sceneBlocked=false;
   function saveScene(){
+    if(attachment)stopAttachment(false);
     if(sceneBlocked||!current?.id||current.id!==loadedProjectId)return false;
     const data=sceneData();
     try{solveJoints(data);}catch(e){_toast(e.message);return false;}
@@ -479,7 +483,7 @@
     select(null);updateEmpty();refreshAsm();refreshBom();refreshAssemblyGuide();
     if(migrated){current.assembly3d=data;persist();_toast('Legacy 3D scene added to the project. Its original browser copy is retained.');}
   }
-  function clearSceneObjects(){loadedProjectId=null;loadedSignature=null;objects.forEach(o=>{scene.remove(o.obj3d);disposeObject(o.obj3d)});objects=[];selId=null;selectedIds.clear();assemblyGroups=[];assemblyJoints=[];clearMeasurement();exploded=false;assemblyStage=6;transformControls?.detach();if(multiPivot){scene.remove(multiPivot);multiPivot=null;}}
+  function clearSceneObjects(){stopAttachment(false);isolationIds=null;loadedProjectId=null;loadedSignature=null;objects.forEach(o=>{scene.remove(o.obj3d);disposeObject(o.obj3d)});objects=[];selId=null;selectedIds.clear();assemblyGroups=[];assemblyJoints=[];clearMeasurement();exploded=false;assemblyStage=6;transformControls?.detach();if(multiPivot){scene.remove(multiPivot);multiPivot=null;}}
   function assembledView(){if(exploded)toggleExplode();if(assemblyStage!==6)setAssemblyStage(6,false);}
   function applyRecordAppearance(rec){
     rec.obj3d.visible=rec.visible;
@@ -578,7 +582,7 @@
     transformControls=new T.TransformControls(camera,renderer.domElement);transformControls.setSize(.8);scene.add(transformControls);
     transformControls.addEventListener('mouseDown',()=>{const rec=objects.find(o=>o.id===selId);if(rec){const target=selectedIds.size>1?multiPivot:rec.obj3d;target.updateMatrixWorld(true);dragStart={id:rec.id,data:sceneData(),matrix:target.matrixWorld.clone(),position:rec.obj3d.position.clone(),rotation:rec.obj3d.rotation.clone()};}});
     transformControls.addEventListener('objectChange',()=>{if(!dragStart||selectedIds.size<2)return;multiPivot.updateMatrixWorld(true);const delta=new window.THREE.Matrix4().multiplyMatrices(multiPivot.matrixWorld,dragStart.matrix.clone().invert());for(const item of dragStart.data.objects.filter(o=>selectedIds.has(o.id))){const record=objects.find(o=>o.id===item.id),next={};setMatrixRecord(next,delta.clone().multiply(matrixOf(item.position.map(v=>v/10),item.rotation)));record.obj3d.position.fromArray(next.position);record.obj3d.rotation.set(...next.rotation.map(v=>v*Math.PI/180));}});
-    transformControls.addEventListener('dragging-changed',e=>{controls.enabled=!e.value&&mode==='orbit';});
+    transformControls.addEventListener('dragging-changed',e=>{controls.enabled=!e.value&&mode!=='attach-drag';});
     transformControls.addEventListener('mouseUp',()=>{if(!dragStart)return;const before=dragStart.data,ids=[...selectedIds];try{const candidate=sceneData();solveJoints(candidate);if(!StudioAssembly.validate(candidate))throw Error('Transform exceeds the assembly limits.');saveScene();}catch(e){current.assembly3d=before;loadedSignature=null;loadScene();for(const id of ids)select(id,true,true);_toast(e.message+' Previous assembly restored.');}dragStart=null;renderInsp();renderAssemblyTools();syncTransformHandles();});
     renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();editorReady=false;pauseEditor();const load=document.getElementById('v3dLoad');if(load){load.style.display='flex';load.textContent='Graphics context lost. Waiting for the browser to restore it…';}});
     renderer.domElement.addEventListener('webglcontextrestored',()=>{editorReady=true;if(isActive())enterEditor();});
@@ -621,16 +625,17 @@
       }});
     }catch(e){_toast(e.message);}
   }
-  function place(partId) {
+  function place(partId,overrides={}) {
     if(partId==='custom_solid')return modelPart();
     if(sceneBlocked||!editorReady)return _toast('Resolve the 3D loading error first.');
     if(objects.length>=200)return _toast('Assemblies support up to 200 parts.');
     assembledView();
-    const def = ALL_PARTS.find(p => p.id === partId);
+    const original=ALL_PARTS.find(p=>p.id===partId);const def=original?{...structuredClone(original),...(overrides.dims?{dims:structuredClone(overrides.dims)}:{}),...(overrides.mat?{mat:overrides.mat,col:MAT_COLORS[overrides.mat]}:{})}:null;
     if (!def || !editorReady) {
       if (!editorReady) _toast('3D engine is loading…');
       return;
     }
+    if(!StudioAssembly.dimensions(def.id,def.dims)||!StudioAssembly.materials.includes(def.mat))return _toast('Choose valid dimensions and material.');
     const obj3d = build(structuredClone(def));
     const n = objects.length;
     const T=window.THREE,localBounds=new T.Box3().setFromObject(obj3d);
@@ -661,6 +666,50 @@
     _toast('Placed: ' + rec.name);
   }
 
+  /* Guided interaction: previews never change saved geometry before confirmation. */
+  function hint(message){const el=document.getElementById('assemblyHint');if(el)el.textContent=message;}
+  function filterCatalogue(){const query=(document.getElementById('partsSearch')?.value||'').toLowerCase().trim(),category=document.getElementById('partsCategory')?.value||'all';let total=0;document.querySelectorAll('[data-part-category]').forEach(group=>{let count=0;group.querySelectorAll('.catalogueCard').forEach(card=>{const part=ALL_PARTS.find(p=>p.id===card.querySelector('[data-insert]').dataset.insert),match=(category==='all'||category===group.dataset.partCategory)&&(!query||(part.name+' '+part.desc+' '+part.id+' '+group.dataset.partCategory).toLowerCase().includes(query));card.hidden=!match;if(match)count++;});group.hidden=!count;total+=count;});const output=document.getElementById('partsFilterCount');if(output)output.textContent=total+' matching parts · preview or click to add';const empty=document.getElementById('noPartsFound');if(empty)empty.hidden=!!total;}
+  function filterAssembly(){const query=(document.getElementById('assemblySearch')?.value||'').toLowerCase().trim();document.querySelectorAll('#asmList [data-asm]').forEach(row=>{const record=objects.find(o=>o.id===row.dataset.asm);row.hidden=!!query&&!(record&&(record.name+' '+record.def.id+' '+(record.def.desc||'')+' '+record.def.mat).toLowerCase().includes(query));});document.querySelectorAll('#asmList .asm-group').forEach(group=>{group.hidden=!!query&&![...group.querySelectorAll('[data-asm]')].some(row=>!row.hidden);if(query&&!group.hidden)group.open=true;});}
+  async function renderCatalogueThumbnails(){
+    if(!document.getElementById('partsList')||!window.THREE)return;const ticket=++thumbnailTicket,T=window.THREE;if(ALL_PARTS.every(p=>p.id==='custom_solid'||thumbnailCache.has(p.id))){for(const def of ALL_PARTS){if(ticket!==thumbnailTicket)break;const host=document.querySelector(`[data-insert="${def.id}"] .part-icon`);if(host&&thumbnailCache.has(def.id))host.innerHTML=`<img src="${thumbnailCache.get(def.id)}" alt="" width="72" height="54">`;}return;}let r;try{r=new T.WebGLRenderer({antialias:true,alpha:true});r.setSize(120,90);r.setPixelRatio(1);const s=new T.Scene(),c=new T.PerspectiveCamera(36,4/3,.01,10000);s.add(new T.HemisphereLight(0xffffff,0x526958,2));const light=new T.DirectionalLight(0xffffff,3);light.position.set(8,14,10);s.add(light);
+      for(const def of ALL_PARTS){if(ticket!==thumbnailTicket)break;const host=document.querySelector(`[data-insert="${def.id}"] .part-icon`);if(!host?.isConnected)break;if(def.id==='custom_solid')continue;if(!thumbnailCache.has(def.id)){const mesh=build(structuredClone(def));s.add(mesh);const b=new T.Box3().setFromObject(mesh),centre=b.getCenter(new T.Vector3()),distance=Math.max(.1,b.getSize(new T.Vector3()).length()*1.8);c.position.copy(centre).add(new T.Vector3(.75,.65,1).normalize().multiplyScalar(distance));c.lookAt(centre);r.render(s,c);thumbnailCache.set(def.id,r.domElement.toDataURL('image/png'));s.remove(mesh);disposeObject(mesh);}host.innerHTML=`<img src="${thumbnailCache.get(def.id)}" alt="" width="72" height="54">`;await new Promise(resolve=>setTimeout(resolve,0));}
+    }catch{}finally{r?.dispose();}
+  }
+  function frameBounds(bounds){if(!camera||!controls||bounds.isEmpty())return;const T=window.THREE,centre=bounds.getCenter(new T.Vector3()),size=bounds.getSize(new T.Vector3()),distance=Math.max(.5,Math.max(size.x,size.y,size.z)/(2*Math.tan(camera.fov*Math.PI/360))*1.5/Math.min(1,camera.aspect)),direction=camera.position.clone().sub(controls.target);if(direction.length()<.001)direction.set(.7,.65,.7);controls.target.copy(centre);camera.position.copy(centre).addScaledVector(direction.normalize(),distance);controls.update();}
+  function focusSelected(){if(!selectedIds.size)return _toast('Click a part to focus it.');const bounds=new window.THREE.Box3();objects.filter(o=>selectedIds.has(o.id)).forEach(o=>{if(o.visible)o.obj3d.visible=true;bounds.union(new window.THREE.Box3().setFromObject(o.obj3d));});frameBounds(bounds);hint('Focused on '+(selectedIds.size===1?objects.find(o=>selectedIds.has(o.id))?.name:selectedIds.size+' parts')+'. Wheel or pinch to zoom.');}
+  function isolateSelected(){if(!selectedIds.size)return _toast('Select a part or group to isolate.');stopAttachment(false);assembledView();isolationIds=new Set(selectedIds);objects.forEach(o=>o.obj3d.visible=o.visible&&isolationIds.has(o.id));focusSelected();hint('Only your selection is shown. Show all restores the assembly; exports still use saved visibility.');}
+  function showAllParts(){stopAttachment(false);isolationIds=null;assembledView();const changed=objects.some(o=>!o.visible);objects.forEach(o=>{o.visible=true;o.obj3d.visible=true;});if(changed)saveScene();refreshAsm();renderInsp();fitAssembly();hint('All parts are visible. Click a part to customize it.');}
+  function toggleWorkspaceFocus(force){focusMode=typeof force==='boolean'?force:!focusMode;document.body.classList.toggle('studioFocus',focusMode);const exit=document.getElementById('leaveWorkspaceFocus');if(exit)exit.hidden=!focusMode;requestAnimationFrame(()=>{const vp=document.getElementById('vp3d');if(vp&&renderer&&camera){renderer.setSize(vp.clientWidth,vp.clientHeight,false);camera.aspect=vp.clientWidth/vp.clientHeight;camera.updateProjectionMatrix();}});}
+  function detachSelected(){try{stopAttachment(false);const data=sceneData(),ids=new Set(selectedIds),removed=(data.joints||[]).filter(j=>ids.has(j.child)&&!ids.has(j.parent));if(!removed.length)throw Error('The selected parts have no incoming attachment to detach.');data.joints=data.joints.filter(j=>!removed.includes(j));commitAssembly(data,[...ids]);hint('Detached. You can drag this part or attach it to another face.');}catch(e){_toast(e.message);}}
+  function surfacePick(event,excluded=new Set()){
+    if(!raycaster||!camera)return null;const canvas=document.getElementById('v3dCanvas'),rect=canvas?.getBoundingClientRect();if(!rect?.width||event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)return null;raycaster.setFromCamera({x:(event.clientX-rect.left)/rect.width*2-1,y:-(event.clientY-rect.top)/rect.height*2+1},camera);
+    const meshes=[],owners=new Map();for(const record of objects.filter(o=>o.visible&&o.obj3d.visible&&!excluded.has(o.id)))record.obj3d.traverse(mesh=>{if(mesh.isMesh){meshes.push(mesh);owners.set(mesh,record);}});const hit=raycaster.intersectObjects(meshes,false)[0];if(!hit?.face)return null;const T=window.THREE,record=owners.get(hit.object),normal=hit.face.normal.clone().applyMatrix3(new T.Matrix3().getNormalMatrix(hit.object.matrixWorld)).normalize(),point=hit.point.clone().multiplyScalar(10);return {id:record.id,name:record.name,point:point.toArray(),normal:normal.toArray(),centre:null};
+  }
+  function faceCentre(pick){if(pick.centre)return pick.centre;const T=window.THREE,record=objects.find(o=>o.id===pick.id);if(!record)return pick.point;const normal=new T.Vector3(...pick.normal),origin=new T.Vector3(...pick.point),sum=new T.Vector3();let area=0;
+    record.obj3d.updateMatrixWorld(true);record.obj3d.traverse(mesh=>{if(!mesh.isMesh)return;const p=mesh.geometry.attributes.position,index=mesh.geometry.index,count=index?index.count:p.count;for(let i=0;i<count;i+=3){const v=[0,1,2].map(k=>{const n=index?index.getX(i+k):i+k;return new T.Vector3(p.getX(n),p.getY(n),p.getZ(n)).applyMatrix4(mesh.matrixWorld).multiplyScalar(10);}),cross=new T.Vector3().crossVectors(v[1].clone().sub(v[0]),v[2].clone().sub(v[0])),twice=cross.length();if(twice<1e-8||cross.clone().normalize().dot(normal)<.9999||v.some(p=>Math.abs(normal.dot(p.clone().sub(origin)))>.01))continue;sum.addScaledVector(v[0].clone().add(v[1]).add(v[2]).divideScalar(3),twice);area+=twice;}});pick.centre=area?sum.divideScalar(area).toArray():pick.point;return pick.centre;
+  }
+  function attachmentOptions(){return {gapMm:Number(document.getElementById('attachmentGap')?.value||0),spinDegrees:Number(document.getElementById('attachmentSpin')?.value||0),align:document.getElementById('attachmentAlign')?.checked!==false,lock:document.getElementById('attachmentLock')?.checked!==false};}
+  function drawAttachmentMarkers(){if(attachmentMarkers){scene.remove(attachmentMarkers);disposeObject(attachmentMarkers);}attachmentMarkers=new window.THREE.Group();scene.add(attachmentMarkers);const T=window.THREE;for(const [pick,color] of [[attachment?.source,0xf3ca77],[attachment?.target,0x88d3ff]]){if(!pick)continue;const point=new T.Vector3(...(document.getElementById('attachmentCentres').checked&&pick.id?faceCentre(pick):pick.point)).multiplyScalar(.1),end=point.clone().addScaledVector(new T.Vector3(...pick.normal),1.2),line=new T.Line(new T.BufferGeometry().setFromPoints([point,end]),new T.LineBasicMaterial({color,depthTest:false})),dot=new T.Mesh(new T.SphereGeometry(.075,12,8),new T.MeshBasicMaterial({color,depthTest:false}));dot.position.copy(point);line.renderOrder=dot.renderOrder=100;attachmentMarkers.add(line,dot);}}
+  function clearAttachmentGhost(){if(attachmentGhost){scene?.remove(attachmentGhost);attachmentGhost.traverse(o=>{if(o.isMesh)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose());});attachmentGhost=null;}attachmentGhosts.clear();if(attachmentMarkers){scene?.remove(attachmentMarkers);disposeObject(attachmentMarkers);attachmentMarkers=null;}}
+  function stopAttachment(message=true){if(!attachment&&!attachmentGhost)return;const old=attachment;attachment=null;clearAttachmentGhost();for(const [id,visible] of old?.originalVisibility||[])objects.find(o=>o.id===id)?.obj3d&&(objects.find(o=>o.id===id).obj3d.visible=visible);const options=document.getElementById('attachmentOptions');if(options)options.hidden=true;document.getElementById('attachFaces')?.classList.remove('active');document.getElementById('dragSnap')?.classList.remove('active');if(mode==='attach-drag')setMode('orbit');if(message)hint('Attachment cancelled. Your original assembly is unchanged.');}
+  function beginAttachment(kind){try{stopAttachment(false);facePicking=false;measureMode=false;assembledView();if(objects.filter(o=>o.visible).length<2&&kind==='faces')throw Error('Add two parts first. Preview & size helps you customize each one.');attachment={kind,phase:'source',projectId:current.id,before:null,source:null,target:null,movingIds:[],draft:null,originalVisibility:new Map()};document.getElementById('attachmentOptions').hidden=false;document.getElementById('applyAttachment').disabled=true;document.getElementById(kind==='drag'?'dragSnap':'attachFaces').classList.add('active');setMode(kind==='drag'?'attach-drag':'orbit');hint(kind==='drag'?'Drag a part onto another surface. Its bottom snaps to that surface. Drop on empty space to move freely.':'Step 1 of 3 · Click the face of the part you want to move.');}catch(e){_toast(e.message);}}
+  function captureAttachmentSource(pick,bottom=false){const data=sceneData();if(!selectedIds.has(pick.id))select(pick.id);const ids=StudioPlacement.moving(data,[...selectedIds]);attachment.before=data;attachment.signature=JSON.stringify(data);attachment.movingIds=[...ids];attachment.source=pick;attachment.phase='target';attachment.originalVisibility=new Map(objects.filter(o=>ids.has(o.id)).map(o=>[o.id,o.obj3d.visible]));if(bottom){const bounds=new window.THREE.Box3();objects.filter(o=>ids.has(o.id)).forEach(o=>bounds.union(new window.THREE.Box3().setFromObject(o.obj3d)));const centre=bounds.getCenter(new window.THREE.Vector3());attachment.source={...pick,point:[centre.x*10,bounds.min.y*10,centre.z*10],normal:[0,-1,0],centre:[centre.x*10,bounds.min.y*10,centre.z*10]};}}
+  function previewAttachment(){if(!attachment?.source||!attachment.target)return false;try{if(attachment.projectId!==current.id||attachment.signature!==JSON.stringify(sceneData()))throw Error('Assembly changed. Cancel and pick the faces again.');const options=attachmentOptions(),centres=document.getElementById('attachmentCentres').checked,sourcePoint=centres?faceCentre(attachment.source):attachment.source.point,targetPoint=centres&&attachment.target.id?faceCentre(attachment.target):attachment.target.point,draft=StudioPlacement.mate(window.THREE,attachment.before,{...options,movingIds:attachment.movingIds,sourceId:attachment.source.id,targetId:attachment.target.id,sourcePoint,sourceNormal:attachment.source.normal,targetPoint,targetNormal:attachment.target.normal,...(attachment.freeMove?{align:false,lock:false,gapMm:0}:{})});attachment.draft=draft;
+      if(!attachmentGhost){attachmentGhost=new window.THREE.Group();scene.add(attachmentGhost);for(const record of objects.filter(o=>attachment.movingIds.includes(o.id))){const ghost=record.obj3d.clone(true);ghost.traverse(mesh=>{if(mesh.isMesh){mesh.material=(Array.isArray(mesh.material)?mesh.material:[mesh.material]).map(m=>{const material=m.clone();material.transparent=true;material.opacity=.65;material.depthWrite=false;material.color.setHex(0xb7df83);return material;});if(mesh.material.length===1)mesh.material=mesh.material[0];}});attachmentGhost.add(ghost);attachmentGhosts.set(record.id,ghost);record.obj3d.visible=false;}}
+      for(const item of draft.objects){const ghost=attachmentGhosts.get(item.id);if(ghost){ghost.position.fromArray(item.position.map(v=>v/10));ghost.rotation.set(...item.rotation.map(v=>v*Math.PI/180));}}drawAttachmentMarkers();document.getElementById('applyAttachment').disabled=false;hint(attachment.kind==='faces'?'Step 3 of 3 · Preview ready. Adjust gap or turn, then choose Attach now.':'Release to '+(attachment.freeMove?'move freely.':'snap onto '+attachment.target.name+'.'));return true;
+    }catch(e){attachment.draft=null;document.getElementById('applyAttachment').disabled=true;hint(e.message);return false;}}
+  function attachmentPick(event){if(attachment.kind!=='faces')return;try{const pick=surfacePick(event,new Set(attachment.phase==='source'?[]:attachment.movingIds));if(!pick)return hint('Click a visible mesh face. You can orbit between picks.');if(attachment.phase==='source'){captureAttachmentSource(pick);drawAttachmentMarkers();hint('Step 2 of 3 · Moving '+pick.name+'. Click a face on the stationary target. You can orbit to reach it.');}else{attachment.target=pick;previewAttachment();}}catch(e){hint(e.message);}}
+  function applyAttachment(){if(!attachment?.draft)return;try{if(attachment.signature!==JSON.stringify(sceneData())||current.id!==attachment.projectId)throw Error('The assembly changed. Pick the faces again.');const draft=attachment.draft,ids=attachment.movingIds,free=attachment.freeMove;stopAttachment(false);commitAssembly(draft,ids);hint(free?'Part moved. Undo is available.':'Parts attached. Choose Detach to reposition them; Undo restores the previous assembly.');_toast(free?'Part moved':'Attachment applied');}catch(e){hint(e.message);}}
+  function dragAttachmentStart(event){if(event.button!==0)return;const pick=surfacePick(event);if(!pick)return;try{captureAttachmentSource(pick,true);attachment.dragging=true;dragGrab=new window.THREE.Vector3(...pick.point).multiplyScalar(.1);dragPlane=new window.THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new window.THREE.Vector3()),dragGrab);document.getElementById('vp3d').setPointerCapture(event.pointerId);}catch(e){hint(e.message);}}
+  function dragAttachmentMove(event,force=false){if(!attachment?.dragging)return;if(!force&&performance.now()-dragThrottle<60)return;dragThrottle=performance.now();const target=surfacePick(event,new Set(attachment.movingIds));if(target){attachment.target=target;attachment.freeMove=false;}else{const point=raycaster.ray.intersectPlane(dragPlane,new window.THREE.Vector3());if(!point){attachment.draft=null;return;}const offset=point.sub(dragGrab).multiplyScalar(10);attachment.target={id:null,name:'free space',point:attachment.source.point.map((v,k)=>v+offset.getComponent(k)),normal:[0,1,0]};attachment.freeMove=true;}previewAttachment();}
+  function dragAttachmentEnd(event){if(!dragged){stopAttachment(false);skipPick=true;hint('No move applied. Choose Drag & snap, then hold and drag a part.');return;}const rect=document.getElementById('v3dCanvas').getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom){stopAttachment();skipPick=!dragged;return;}dragAttachmentMove(event,true);if(attachment)attachment.dragging=false;skipPick=!dragged;if(attachment?.draft)applyAttachment();else stopAttachment();}
+  function dropLibraryPart(event){event.preventDefault();try{stopAttachment(false);const id=event.dataTransfer.getData('application/x-studio-part'),def=ALL_PARTS.find(p=>p.id===id);if(!def||id==='custom_solid')return;if(objects.length>=200)throw Error('Assemblies support up to 200 parts.');assembledView();const hit=surfacePick(event),T=window.THREE,mesh=build(structuredClone(def)),bounds=new T.Box3().setFromObject(mesh),centre=bounds.getCenter(new T.Vector3());disposeObject(mesh);let target=hit;if(!target){const ground=raycaster.ray.intersectPlane(new T.Plane(new T.Vector3(0,1,0),0),new T.Vector3());if(!ground)throw Error('Drop onto a visible surface or the ground plane.');target={id:null,point:ground.multiplyScalar(10).toArray(),normal:[0,1,0]};}const record={id:uid(),partId:def.id,name:def.name,dims:structuredClone(def.dims),material:def.mat,position:[0,0,0],rotation:[0,0,0],visible:true,wireframe:false},data=sceneData();data.objects.push(record);const draft=StudioPlacement.mate(T,data,{movingIds:[record.id],sourceId:record.id,targetId:target.id,sourcePoint:[centre.x*10,bounds.min.y*10,centre.z*10],sourceNormal:[0,-1,0],targetPoint:target.point,targetNormal:target.normal,lock:target.id!==null});commitAssembly(draft,[record.id]);hint('Part placed on the drop surface. Change its dimensions in Customize selected part, or Undo.');}catch(e){_toast(e.message);}}
+  function bindUsability(){if(!document.getElementById('assemblyCoach'))return;const bind=(id,fn)=>{const node=document.getElementById(id);if(node)node.onclick=fn;};bind('jumpCustomize',()=>{document.querySelector('.editor3d-inspector').scrollTop=0;});bind('jumpAssembly',()=>{const panel=document.querySelector('.editor3d-inspector'),target=document.getElementById('assemblySearch');if(getComputedStyle(panel).overflowY==='visible')target.scrollIntoView({block:'nearest'});else panel.scrollTop+=target.getBoundingClientRect().top-panel.getBoundingClientRect().top-55;});bind('attachFaces',()=>beginAttachment('faces'));bind('dragSnap',()=>beginAttachment('drag'));bind('focusSelected',focusSelected);bind('isolateSelected',isolateSelected);bind('showAllParts',showAllParts);bind('workspaceFocus',()=>toggleWorkspaceFocus());bind('leaveWorkspaceFocus',()=>toggleWorkspaceFocus(false));bind('applyAttachment',applyAttachment);bind('cancelAttachment',()=>stopAttachment());bind('retryAttachment',()=>beginAttachment(attachment?.kind||'faces'));for(const id of ['attachmentCentres','attachmentGap','attachmentSpin','attachmentAlign','attachmentLock'])document.getElementById(id).onchange=previewAttachment;document.getElementById('assemblySearch').oninput=filterAssembly;
+    document.querySelectorAll('[data-workspace-panel]').forEach(b=>b.onclick=()=>{document.getElementById('editor3d').dataset.mobilePanel=b.dataset.workspacePanel;if(!focusMode)document.querySelector(b.dataset.workspacePanel==='parts'?'.editor3d-parts':'.editor3d-inspector').scrollIntoView({block:'nearest'});});
+    document.querySelectorAll('[data-preview-part]').forEach(button=>button.onclick=()=>{const def=ALL_PARTS.find(p=>p.id===button.dataset.previewPart);if(def.id==='custom_solid')return modelPart();const project=current.id;StudioPartPreview.open(def,async draft=>{if(current.id!==project||!isActive())throw Error('The active project changed. Reopen the preview.');const count=objects.length;place(def.id,{dims:draft.dims,mat:draft.mat});if(objects.length!==count+1)throw Error('The part could not be inserted. Resolve the assembly limit first.');}).catch(e=>_toast(e.message));});
+    document.querySelectorAll('[data-insert]').forEach(button=>{button.ondragstart=event=>{if(button.dataset.insert==='custom_solid'){event.preventDefault();return;}event.dataTransfer.setData('application/x-studio-part',button.dataset.insert);event.dataTransfer.effectAllowed='copy';hint('Drop onto a part to attach, or onto the ground to place.');};});const vp=document.getElementById('vp3d');vp.ondragover=event=>{if(event.dataTransfer.types.includes('application/x-studio-part')){event.preventDefault();event.dataTransfer.dropEffect='copy';}};vp.ondrop=dropLibraryPart;
+  }
+
   /* Persistent assembly operations. All mutations pass the same project validator. */
   function matrixOf(position,rotation){const T=window.THREE;return new T.Matrix4().compose(new T.Vector3(...position),new T.Quaternion().setFromEuler(new T.Euler(...rotation.map(v=>v*Math.PI/180))),new T.Vector3(1,1,1));}
   function setMatrixRecord(record,matrix){const T=window.THREE,p=new T.Vector3(),q=new T.Quaternion(),s=new T.Vector3();matrix.decompose(p,q,s);const e=new T.Euler().setFromQuaternion(q);record.position=p.toArray();record.rotation=[e.x,e.y,e.z].map(v=>v*180/Math.PI);}
@@ -672,6 +721,7 @@
   function commitAssembly(data,selection=[]){
     if(sceneBlocked||current?.id!==loadedProjectId)throw Error('Reopen the active 3D project first.');
     solveJoints(data);if(!StudioAssembly.validate(data))throw Error('The edit exceeds assembly, transform or geometry limits.');
+    stopAttachment(false);
     const previous=current.assembly3d;try{current.assembly3d=data;loadedSignature=null;loadScene();select(null);for(const id of selection)select(id,true,true);saveScene();}catch(e){current.assembly3d=previous;loadedSignature=null;loadScene();throw e;}
   }
   function editableSelection(data){if(!selectedIds.size)throw Error('Select parts using the tree checkboxes or Ctrl-click.');if((data.joints||[]).some(j=>selectedIds.has(j.child)&&!selectedIds.has(j.parent)))throw Error('This part is joint-driven. Adjust or remove its joint before moving or aligning it.');return data.objects.filter(o=>selectedIds.has(o.id));}
@@ -718,6 +768,7 @@
   function select(id,additive=false,individual=false) {
     if(!additive)selectedIds.clear();
     if(id){const group=individual?null:assemblyGroups.find(g=>g.members.includes(id));const ids=group?group.members:[id];const remove=additive&&ids.every(i=>selectedIds.has(i));ids.forEach(i=>remove?selectedIds.delete(i):selectedIds.add(i));}
+    if(id&&!attachment&&document.getElementById('editor3d'))document.getElementById('editor3d').dataset.mobilePanel='edit';
     const target=objects.find(o=>o.id===id);if(target?.visible&&!target.obj3d.visible)setAssemblyStage(6,false);
     objects.forEach(o => o.obj3d.traverse(c => {
       if (c.isMesh && c.material?.emissive) c.material.emissive.setHex(0);
@@ -750,7 +801,7 @@
   }
 
   function pick(e) {
-    if(!measureMode&&!facePicking&&mode==='orbit'||transformControls?.dragging||['move','rotate'].includes(mode)&&transformControls?.axis||!raycaster||!camera)return;
+    if(skipPick){skipPick=false;return;}if(attachment){attachmentPick(e);return;}if(transformControls?.dragging||['move','rotate'].includes(mode)&&transformControls?.axis||!raycaster||!camera)return;
     const canvas = document.getElementById('v3dCanvas');
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -797,13 +848,14 @@
     const rot = rec.obj3d.rotation;
 
     el.innerHTML = `
-      <div class="inspector-section"><h4>Part Label</h4>
-        <div class="dim-field"><label for="insp-name">Name</label><input type="text" id="insp-name" value="${esc(rec.name)}" maxlength="80"></div>
-      </div>
-      <div class="inspector-section"><h4>Dimensions · mm</h4>
+      <div class="selectedPartTitle">${esc(rec.name)}</div>
+      <div class="inspector-section">${assemblyJoints.some(j=>j.child===rec.id)?'<p class="attachedPartNote">Attached: Detach before moving. After resizing, recheck the contact.</p>':''}<div class="selectionShortcuts"><button id="insp-focus">Focus</button><button id="insp-attach">Attach</button><button id="insp-detach" ${assemblyJoints.some(j=>j.child===rec.id)?'':'disabled'}>Detach</button></div><h4>Dimensions · mm</h4>
         <div class="dim-grid">${dimRows}</div>
         <button class="dim-apply" id="applyDims">↻ Rebuild geometry</button>
         ${rec.def.model?'<button class="dim-apply" id="insp-model">Edit profile & features</button>':''}
+      </div>
+      <div class="inspector-section"><h4>Part Label</h4>
+        <div class="dim-field"><label for="insp-name">Name</label><input type="text" id="insp-name" value="${esc(rec.name)}" maxlength="80"></div>
       </div>
       <div class="inspector-section"><h4>Position · mm</h4>
         <div class="dim-grid">
@@ -827,12 +879,13 @@
           <button id="insp-del" style="color:#e07878;border-color:#4a2c2c;background:#241818">Delete</button>
         </div>
       </div>`;
-    bindInsp(rec);
+    bindInsp(rec);if(selectedIds.size===1)document.querySelector('.editor3d-inspector').scrollTop=0;
     document.getElementById('applyPos').disabled=exploded;document.getElementById('applyRot').disabled=exploded;
     if(assemblyJoints.some(j=>j.child===rec.id)){document.getElementById('applyPos').disabled=true;document.getElementById('applyRot').disabled=true;}
   }
 
   function bindInsp(rec) {
+    document.getElementById('insp-focus').onclick=focusSelected;document.getElementById('insp-attach').onclick=()=>beginAttachment('faces');document.getElementById('insp-detach').onclick=detachSelected;
     const modelButton=document.getElementById('insp-model');if(modelButton)modelButton.onclick=()=>modelPart(rec.id);
     document.getElementById('insp-name').onchange = e => {
       rec.name = e.target.value.trim().slice(0, 80) || rec.name;
@@ -922,6 +975,7 @@
     });
     el.querySelectorAll('[data-multi]').forEach(input=>input.onclick=e=>{e.stopPropagation();select(input.dataset.multi,true,true)});
 
+    filterAssembly();
     el.querySelectorAll('[data-vis]').forEach(btn => btn.onclick = () => {
       const r = objects.find(o => o.id === btn.dataset.vis);
       if (r) {
@@ -1078,9 +1132,10 @@
   }
 
   function setMode(m) {
+    if(attachment&&((attachment.kind==='drag'&&m!=='attach-drag')||['move','rotate','select'].includes(m)))stopAttachment(false);
     if(['move','rotate'].includes(m))assembledView();
     mode = m;
-    if (controls) controls.enabled = (m === 'orbit');
+    if (controls) controls.enabled = m!=='attach-drag';
     const modeEl = document.getElementById('v3dModeLabel');
     if (modeEl) modeEl.textContent = '● ' + m.toUpperCase();
     ['tb-orbit','tb-select','tb-move','tb-rotate'].forEach(id=>document.getElementById(id)?.classList.toggle('active',id==='tb-'+m));syncTransformHandles();
@@ -1125,6 +1180,7 @@
 
   /* ─── STL & OBJ Exporters ─────────────────────────────────────── */
   function exportSTL() {
+    if(attachment)return _toast('Apply or cancel the attachment preview before exporting.');
     if (!objects.some(o=>o.visible)) { _toast('No visible parts to export'); return; }
     assembledView();
     const T = window.THREE;
@@ -1151,6 +1207,7 @@
   }
 
   function exportOBJ() {
+    if(attachment)return _toast('Apply or cancel the attachment preview before exporting.');
     if (!objects.some(o=>o.visible)) { _toast('No visible parts to export'); return; }
     assembledView();
     const T = window.THREE;
@@ -1273,25 +1330,20 @@
       if (gridHelper) gridHelper.visible = !gridHelper.visible;
     });
 
+    bindUsability();
     // Parts catalogue insertion
     document.querySelectorAll('[data-insert]').forEach(el =>
       el.onclick=()=>place(el.dataset.insert)
     );
 
     // Filter catalogue
-    const search=document.getElementById('partsSearch');if(search)search.oninput=e=>{
-      const q = e.target.value.toLowerCase();
-      document.querySelectorAll('.part-item').forEach(el => {
-        const strong = el.querySelector('strong')?.textContent.toLowerCase() || '';
-        const small = el.querySelector('small')?.textContent.toLowerCase() || '';
-        el.style.display = (strong.includes(q) || small.includes(q)) ? '' : 'none';
-      });
-    };
+    const search=document.getElementById('partsSearch');if(search)search.oninput=filterCatalogue;const categoryFilter=document.getElementById('partsCategory');if(categoryFilter)categoryFilter.onchange=filterCatalogue;filterCatalogue();
+
 
     // Viewport click & raycaster tracking
     const vp = document.getElementById('vp3d');
     if (vp) {
-      vp.onclick=e=>{if(!e.target.closest('button')&&!dragged)pick(e)};vp.onpointerdown=e=>{pointerStart=[e.clientX,e.clientY];dragged=false};vp.onpointermove=e=>{if(pointerStart&&Math.hypot(e.clientX-pointerStart[0],e.clientY-pointerStart[1])>5)dragged=true};
+      vp.onclick=e=>{if(!e.target.closest('button')&&!dragged)pick(e)};vp.onpointerdown=e=>{pointerStart=[e.clientX,e.clientY];dragged=false;if(attachment?.kind==='drag')dragAttachmentStart(e);};vp.onpointermove=e=>{if(pointerStart&&Math.hypot(e.clientX-pointerStart[0],e.clientY-pointerStart[1])>5)dragged=true;if(attachment?.dragging)dragAttachmentMove(e);};vp.onpointerup=e=>{if(attachment?.dragging)dragAttachmentEnd(e);};vp.onpointercancel=()=>stopAttachment();vp.ondblclick=e=>{if(!attachment){pick(e);focusSelected();}};
       vp.oncontextmenu=e=>{
         e.preventDefault();
         if (mode === 'select') showCtx(e.clientX, e.clientY);
@@ -1317,13 +1369,14 @@
     // Keyboard shortcuts
     const onKey = e => {
       if(!isActive()||!editorReady||document.getElementById('dialog')?.open||e.target.isContentEditable)return;
+      if(e.key==='Escape'&&(attachment||focusMode)){e.preventDefault();if(attachment)stopAttachment();else toggleWorkspaceFocus(false);return;}
       if (e.target.closest('input, textarea, select')) return;
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); delSelected(); }
-      else if (e.key === 'Escape') { facePicking=false;select(null); }
+      else if (e.key === 'Escape') { facePicking=false;if(attachment)stopAttachment();else if(focusMode)toggleWorkspaceFocus(false);else select(null); }
       else if (e.key === '1') { setCam('top'); }
       else if (e.key === '2') { setCam('front'); }
       else if (e.key === '3') { setCam('iso'); }
-      else if(e.key.toLowerCase()==='f')fitAssembly();
+      else if(e.key.toLowerCase()==='f'){if(selectedIds.size)focusSelected();else fitAssembly();}
       else if (e.key.toLowerCase() === 'o') { setMode('orbit'); }
       else if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey) { setMode('select'); }
       else if (e.key.toLowerCase() === 'd' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); dupSelected(); }
@@ -1339,7 +1392,7 @@
 
   /* ─── Enter / Re-enter Tab ───────────────────────────────────── */
   function clearSceneObjectsSafe(){if(scene)clearSceneObjects();}
-  function pauseEditor(){if(raf!==null){cancelAnimationFrame(raf);raf=null;}vpObserver?.disconnect();if(controls)controls.enabled=false;if(transformControls)transformControls.enabled=false;document.getElementById('v3dCtx')?.remove();ctxController?.abort();}
+  function pauseEditor(){stopAttachment(false);if(focusMode)toggleWorkspaceFocus(false);if(raf!==null){cancelAnimationFrame(raf);raf=null;}vpObserver?.disconnect();if(controls)controls.enabled=false;if(transformControls)transformControls.enabled=false;document.getElementById('v3dCtx')?.remove();ctxController?.abort();}
   function isActive(){return page==='3d'&&!document.body.classList.contains('productMode')&&!!document.getElementById('vp3d')?.isConnected&&projects.length>0;}
   async function enterEditor(){
     const ticket=++entrySequence,project=current?.id;
@@ -1353,7 +1406,7 @@
       const vp=document.getElementById('vp3d');observeViewport(vp);
       camera.aspect=Math.max(1,vp.clientWidth)/Math.max(1,vp.clientHeight);camera.updateProjectionMatrix();renderer.setSize(Math.max(1,vp.clientWidth),Math.max(1,vp.clientHeight),false);
       if(changed)fitAssembly();
-      bindEditor();setMode(mode);select(selId);refreshBom();updateEmpty();refreshUndoButtons();
+      bindEditor();setMode(mode);select(selId);renderCatalogueThumbnails();refreshBom();updateEmpty();refreshUndoButtons();
       const loading=document.getElementById('v3dLoad');if(loading)loading.style.display='none';
       if(raf===null)loop();
     }catch(error){
@@ -1369,7 +1422,7 @@
     if(!render._3dPatched){const previous=render;render=function(){pauseEditor();previous();const active=page==='3d'&&projects.length&&!document.body.classList.contains('productMode');document.body.classList.toggle('studio3dActive',!!active);if(active){document.getElementById('content').innerHTML=tabHTML();enterEditor();}};render._3dPatched=true;}
 
   }
-  if(!studioGuides.some(([name])=>name==='3D parts & assemblies'))studioGuides.push(['3D parts & assemblies','Insert a concept part, set dimensions and millimetre positions, and save a project checkpoint. Undo/redo, backups and JSON exports include the assembly. STL/OBJ export visible assembled parts in millimetres, Z-up. These are simplified meshes; threads, fits, exact manufacturer specifications and fabrication readiness are not validated.','3d']);
+  if(!studioGuides.some(([name])=>name==='3D parts & assemblies'))studioGuides.push(['3D parts & assemblies','Preview & size changes a concept part before insertion. Click a mesh to select it in Orbit mode. Attach faces picks a moving face and target face, previews gap/turn and applies a fixed connection. Drag & snap moves a placed part onto a surface; desktop users can also drag library parts onto the canvas. Expand workspace, Focus selected, Isolate and assembly search help with larger scenes. Detach before repositioning an attached part; recheck contact after resizing. Undo/redo, backups and JSON exports include the assembly. STL/OBJ export visible assembled parts in millimetres, Z-up. These are simplified meshes; threads, fits, exact manufacturer specifications and fabrication readiness are not validated.','3d']);
   registerAndRender();
 
 

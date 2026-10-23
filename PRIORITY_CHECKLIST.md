@@ -1,8 +1,10 @@
 # Engineering Studio — current delivery checklist
 
-Reviewed 24 October 2026. Current evidence: [v12 audit](V12_AUDIT.md). Historical milestone reports remain in the repository. Completed means the bounded implementation below; it does not mean professional CAD or manufacturing certification.
+Reviewed 24 October 2026. Current usability evidence: [v13 review](V13_USABILITY_REVIEW.md); broader engineering evidence: [v12 audit](V12_AUDIT.md). Historical milestone reports remain in the repository. Completed means the bounded implementation below; it does not mean professional CAD or manufacturing certification.
 
 ## Delivered and locally verified
+
+- [x] v13 usability: direct mesh selection in Orbit mode, actual part thumbnails, category/search filters, sizing/material previews before insertion, guided face attachment, drag-and-snap, fixed connections/Detach, expanded workspace and selection focus/isolation. Full browser regression: 63 passed, 1 desktop-only drag case skipped on phone.
 
 - [x] Local projects, recovery/Trash, backups, undo/revisions, BOM, reports and product navigation.
 - [x] Editable custom solids, catalogue/drone concept assembly, imports/exports, personal part library, groups/alignment/measurement and fixed/hinge/slider joints.

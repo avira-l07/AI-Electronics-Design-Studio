@@ -1,6 +1,6 @@
 # Engineering Studio — status and remaining work
 
-Reviewed 24 October 2026. The site is an engineering concept workspace with working local tools and a tested account-server implementation. The static publication does not deploy FastAPI/PostgreSQL. Cloud deployment remains held at the owner's request.
+Reviewed 24 October 2026. Latest [v13 usability review](V13_USABILITY_REVIEW.md): guided and drag-based attachment, pre-insertion previews and a canvas-focused layout are delivered. The site is an engineering concept workspace with working local tools and a tested account-server implementation. The static publication does not deploy FastAPI/PostgreSQL. Cloud deployment remains held at the owner's request.
 
 | Screenshot workstream | Current state | Remaining boundary |
 | --- | --- | --- |

@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "test:e2e": "playwright test",
-    "test": "node tests/calculations.cjs && node tests/templates.cjs && node tests/engineering.cjs && node tests/resilience.cjs && node tests/save-flows.cjs && node tests/assembly.cjs && node tests/solid-model.cjs && node tests/workspace-v10.cjs && node tests/engineering-v11.cjs && node tests/engineering-v12.cjs",
+    "test": "node tests/calculations.cjs && node tests/templates.cjs && node tests/engineering.cjs && node tests/resilience.cjs && node tests/save-flows.cjs && node tests/assembly.cjs && node tests/solid-model.cjs && node tests/workspace-v10.cjs && node tests/engineering-v11.cjs && node tests/engineering-v12.cjs && node tests/placement-v13.cjs",
     "vendor:3d": "node scripts/vendor-three.cjs && node scripts/assembly-schema.cjs && node scripts/vendor-solid.cjs"
   },
   "devDependencies": {
