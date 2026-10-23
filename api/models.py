@@ -76,6 +76,19 @@ class UsedRefresh(Base):
     digest: Mapped[str]=mapped_column(String(64),primary_key=True)
     session_id: Mapped[str]=mapped_column(ForeignKey('sessions.id'),index=True)
     expires: Mapped[int]=mapped_column(Integer)
+class ProjectMember(Base):
+    __tablename__='project_members'
+    project_id: Mapped[str]=mapped_column(ForeignKey('projects.id',ondelete='CASCADE'),primary_key=True)
+    user_id: Mapped[str]=mapped_column(ForeignKey('users.id',ondelete='CASCADE'),primary_key=True)
+    role: Mapped[str]=mapped_column(String(12))
+    accepted: Mapped[bool]=mapped_column(Boolean,default=False)
+class ProjectComment(Base):
+    __tablename__='project_comments'
+    id: Mapped[str]=mapped_column(String(36),primary_key=True,default=uid)
+    project_id: Mapped[str]=mapped_column(ForeignKey('projects.id',ondelete='CASCADE'),index=True)
+    user_id: Mapped[str]=mapped_column(ForeignKey('users.id',ondelete='CASCADE'),index=True)
+    body: Mapped[str]=mapped_column(String(2000))
+    created: Mapped[int]=mapped_column(Integer,default=now)
 class Token(Base):
     __tablename__='action_tokens'
     digest: Mapped[str]=mapped_column(String(64),primary_key=True)

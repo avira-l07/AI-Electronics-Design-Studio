@@ -4,6 +4,8 @@ Reviewed on 23 October 2026 against the current source, prior executed checks, a
 
 For the ordered delivery checklist and explicit completed/partial/not-started states, see [PRIORITY_CHECKLIST.md](PRIORITY_CHECKLIST.md).
 
+Latest follow-up: [v11 audit](V11_AUDIT.md) and [Free/Pro scope](FREE_AND_PRO.md). Mesh screening/physical estimates and additional analytical calculations are delivered. Guarded AI proposals and in-app project teams are implemented/tested locally; cloud deployment is explicitly on hold and providers remain unconfigured.
+
 ## Current position
 
 The product is a working engineering concept-workspace prototype. It has real local project workflows, a limited 3D assembly editor and selected engineering calculators. It now includes a first custom mesh solid modeller. It is not yet a complete CAD application or an operational paid cloud service.
@@ -119,15 +121,15 @@ FEA, PCB design, flight simulation and general circuit simulation are separate m
 ## Remaining AI, sharing and teams
 
 - Configure and test live AI explanations, provider failures, quotas, privacy controls and operating cost limits.
-- AI-driven geometry creation/editing is not implemented. It needs structured modelling commands, validation, previews, rollback and clear provenance.
+- Bounded AI polygon/hole proposals now have structured schema validation and explicit preview/apply. Live provider acceptance and broader arbitrary geometry creation/editing remain open.
 - Deploy and acceptance-test the existing read-only snapshot-sharing code.
-- Invitations, memberships, per-project roles, comments, review/approval, presence, real-time multi-user editing and merge/conflict handling remain to build.
+- In-app invitations/acceptance, memberships, viewer/editor roles, comments and version-checked shared JSON editing are now implemented. Shared-canvas editing, presence, richer approval workflows and conflict merging remain open.
 - Public galleries, embeds and marketplace/discovery workflows remain optional future product work.
 
 ## Remaining paid-product work
 
-- Define the actual premium engineering features, plan limits, prices and trial terms. No premium feature set has been invented on the owner's behalf.
-- Enforce every selected paid engineering capability at the appropriate backend boundary.
+- The owner-authorized Free/Pro capability split is implemented (FREE_AND_PRO.md). Final prices, merchant setup, commercial terms and actual payment acceptance remain open.
+- AI modelling and team ownership now have server entitlement checks; validate all deployed service boundaries in staging before charging.
 - Confirm provider/merchant availability and test actual checkout, verification-required and asynchronous payments, webhooks, duplicate/out-of-order events, renewals, expiry, failed payments, cancellation, refunds and the billing portal.
 - Approve the product's invoice/tax, cancellation/refund, privacy, retention and support policies for the actual business.
 - Validate receipts, notifications, coupons/trial eligibility and account-to-subscription reconciliation in staging.
@@ -135,7 +137,7 @@ FEA, PCB design, flight simulation and general circuit simulation are separate m
 
 ## Evidence and limits
 
-The latest v10 checks passed 92 API tests, all JavaScript suites and the full 32-case desktop/phone browser suite. Interactive browser checks covered creating the drone, stage controls, views, dimensions, undo, selected-project reload and saving a revision. The last reviewed geometry suite covered all 32 catalogue entries, motor screw/arm hole alignment, propeller-envelope separation, preview isolation, export and BOM behavior.
+The latest v11 checks passed 104 API tests, all JavaScript suites and the full 40-case desktop/phone browser suite, plus independent STL/OBJ parsing/geometry checks. Interactive browser checks covered creating the drone, stage controls, views, dimensions, undo, selected-project reload and saving a revision. The last reviewed geometry suite covered all 32 catalogue entries, motor screw/arm hole alignment, propeller-envelope separation, preview isolation, export and BOM behavior.
 
 Provider calls in tests were mocked or synthetic. PostgreSQL/container/TLS production behavior, live payments/email/OAuth/AI, restore exercises and remote CI were not established as passing by those results. The standalone browser runner now passes locally. Dependency audit records are historical snapshots, not ongoing guarantees.
 

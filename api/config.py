@@ -13,6 +13,7 @@ class Settings:
     encryption_key: str = os.getenv('ENCRYPTION_KEY', '')
     stripe_key: str = os.getenv('STRIPE_SECRET_KEY', '')
     billing_enabled: bool = os.getenv('BILLING_ENABLED', 'false').lower() == 'true'
+    allow_live_billing: bool = os.getenv('ALLOW_LIVE_BILLING', 'false').lower() == 'true'
     webhook_key: str = os.getenv('STRIPE_WEBHOOK_SECRET', '')
     monthly_price: str = os.getenv('STRIPE_MONTHLY_PRICE_ID', '')
     annual_price: str = os.getenv('STRIPE_ANNUAL_PRICE_ID', '')
@@ -48,4 +49,9 @@ class Settings:
                 raise RuntimeError('Production requires SMTP delivery for verification and recovery.')
         if not 0 <= self.trial_days <= 30:
             raise RuntimeError('TRIAL_DAYS must be between 0 and 30.')
+        if self.billing_enabled and self.environment!='test':
+            if not self.stripe_key.startswith(('sk_test_','sk_live_')) or not self.webhook_key.startswith('whsec_') or not all(p.startswith('price_') for p in [self.monthly_price,self.annual_price]) or self.monthly_price==self.annual_price:
+                raise RuntimeError('Billing requires a Stripe secret, webhook signing secret and distinct monthly/annual price IDs.')
+            if self.stripe_key.startswith('sk_live_') and not self.allow_live_billing:
+                raise RuntimeError('Live billing requires explicit ALLOW_LIVE_BILLING=true after merchant and price acceptance.')
 

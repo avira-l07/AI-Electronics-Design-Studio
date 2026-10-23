@@ -210,7 +210,12 @@ def create_app(settings=None,gateway=None):
         require_profile(db,s,*who);return {'authorized':True,'profile_id':who[1].profile_id}
     @app.get('/api/premium')
     def premium(who=Depends(auth),db=Depends(db_session)):
-        require_premium(db,s,who[0]);require_profile(db,s,*who);return {'authorized':True,'profile_limit':5,'features':[]}
+        from api.product import PLANS
+        require_premium(db,s,who[0]);require_profile(db,s,*who);return {'authorized':True,'profile_limit':5,'features':PLANS['premium']['features']}
+    @app.get('/api/entitlements')
+    def account_entitlements(who=Depends(auth),db=Depends(db_session)):
+        from api.product import entitlements
+        return entitlements(db,s,who[0])
     @app.get('/api/projects')
     def projects(trash:bool=False,who=Depends(auth),db=Depends(db_session)):
         user,session=who;require_profile(db,s,user,session)
@@ -321,14 +326,14 @@ def create_app(settings=None,gateway=None):
     @app.get('/api/account/export')
     def export_account(who=Depends(auth),db=Depends(db_session)):
         user,session=who;recent(user,session)
-        return {'account':public_user(db,user,session),'notifications':[{'message':n.message,'created':n.created} for n in db.scalars(select(Notice).where(Notice.user_id==user.id))],'billing':[{'id':p.id,'amount':p.amount,'currency':p.currency,'status':p.status,'refunded':p.refunded} for p in db.scalars(select(Payment).where(Payment.user_id==user.id))],'projects':[{**json.loads(p.data),'id':p.id,'profile_id':p.profile_id,'version':p.version,'trashed':p.trashed} for p in db.scalars(select(Project).where(Project.user_id==user.id))]}
+        return {'account':public_user(db,user,session),'team_comments':[{'project_id':c.project_id,'body':c.body,'created':c.created} for c in db.scalars(select(ProjectComment).where(ProjectComment.user_id==user.id))],'team_memberships':[{'project_id':m.project_id,'role':m.role,'accepted':m.accepted} for m in db.scalars(select(ProjectMember).where(ProjectMember.user_id==user.id))],'notifications':[{'message':n.message,'created':n.created} for n in db.scalars(select(Notice).where(Notice.user_id==user.id))],'billing':[{'id':p.id,'amount':p.amount,'currency':p.currency,'status':p.status,'refunded':p.refunded} for p in db.scalars(select(Payment).where(Payment.user_id==user.id))],'projects':[{**json.loads(p.data),'id':p.id,'profile_id':p.profile_id,'version':p.version,'trashed':p.trashed} for p in db.scalars(select(Project).where(Project.user_id==user.id))]}
     @app.delete('/api/account')
     def delete_account(body:Credentials,request:Request,response:Response,who=Depends(auth),db=Depends(db_session)):
         rate(db,request,'delete-account',5);user,session=who;recent(user,session)
         reauthenticate(user,body) if user.password else (None if check_otp(s,user,body.code) else fail(403,'Enable and verify a second factor before deleting a Google-only account'))
         # If provider cancellation fails, the transaction aborts; never leave a deleted user renewing silently.
         for sub in db.scalars(select(Subscription).where(Subscription.user_id==user.id,Subscription.status.not_in(['canceled','incomplete_expired']))):app.state.gateway.cancel(sub.id,immediate=True);sub.status='canceled';sub.ends=now()
-        revoke_all(db,user);db.execute(delete(Token).where(Token.user_id==user.id));db.execute(delete(Notice).where(Notice.user_id==user.id));db.execute(delete(Mail).where(Mail.user_id==user.id));db.execute(delete(Project).where(Project.user_id==user.id));db.execute(delete(Profile).where(Profile.user_id==user.id))
+        revoke_all(db,user);db.execute(delete(ProjectComment).where(ProjectComment.user_id==user.id));db.execute(delete(ProjectMember).where(ProjectMember.user_id==user.id));db.execute(delete(Token).where(Token.user_id==user.id));db.execute(delete(Notice).where(Notice.user_id==user.id));db.execute(delete(Mail).where(Mail.user_id==user.id));db.execute(delete(Project).where(Project.user_id==user.id));db.execute(delete(Profile).where(Profile.user_id==user.id))
         user.deleted=True;user.email='deleted-'+user.id+'@invalid.example';user.name='Deleted account';user.password=None;user.google_sub=None;user.totp=None;user.totp_pending=None;user.recovery='[]';user.checkout_url=None
         audit(db,user,'account.deleted',request,s);clear_auth(s,response);return {'deleted':True,'retained':'Pseudonymous payment and audit records are retained under the deployment retention policy.'}
 
@@ -368,6 +373,10 @@ def create_app(settings=None,gateway=None):
     async def integrity_error(request,exc):return JSONResponse({'detail':'Conflicting update. Retry the request.'},409)
     from api.features import install_features
     install_features(app,auth,db_session)
+    from api.ai_modelling import install_ai_modelling
+    from api.collaboration import install_collaboration
+    install_ai_modelling(app,auth,db_session)
+    install_collaboration(app,auth,db_session)
     # Static mount is last. The standalone API can serve this same frontend under one origin.
     app.mount('/',StaticFiles(directory=Path(__file__).resolve().parent.parent/'dist',html=True),name='frontend')
     return app

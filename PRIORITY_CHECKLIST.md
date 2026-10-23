@@ -4,6 +4,8 @@ Reviewed: 23 October 2026. Based on the current source, v9 modelling review and 
 
 Latest implementation: [v10 workspace review](V10_WORKSPACE_REVIEW.md). The five requested tracks now have a delivered, bounded implementation; expanded professional CAD remains separate.
 
+Latest v11: see V11_AUDIT.md and FREE_AND_PRO.md. Cloud deployment is on hold by owner request. Live provider activation is pending infrastructure/merchant configuration.
+
 ## Current stage
 
 Working browser-local engineering workspace and custom mesh-modelling alpha. The backend exists in source but is not deployed by the static site. Secure cloud accounts and real paid subscriptions are not operational on that site.
@@ -50,11 +52,11 @@ The v10 implementation delivers the requested first batch. No background impleme
 | 3 | Add custom STL/OBJ import and a reusable personal parts library | Delivered in v10 within documented limits | Bounded file/triangle sizes, explicit units/orientation, malformed-file recovery, persistent imported geometry and reliable duplicate/export behavior. |
 | 4 | Improve sketch-driven modelling | Basic constraints and sampled curves delivered; broader CAD remains | Add arcs/curves, dimensional/geometric constraints and face-based work planes incrementally; edits regenerate saved models with actionable errors. |
 | 5 | Expand solid and assembly tools | Revolve/taper/twist/mirror/pattern and simple joints delivered; broader CAD remains | Deliver mirror/pattern and revolve first; then separately scope sweep/loft, chamfer/fillet/shell, part-to-part Booleans, mates and collision/clearance checks. Validate each operation before claiming support. |
-| 6 | Validate engineering properties and manufacturing handoff | Partial | Add density-based mass/centre of mass and tolerances; mesh diagnostics and actual external slicer/CAD import checks. Decide the exact BREP/STEP architecture separately. |
-| 7 | Activate a private cloud beta | Partial; requires infrastructure | Deploy API/PostgreSQL/HTTPS and worker; verify real auth/email/OAuth, profiles, cross-device saves, conflicts, migrations/rollback and backup restoration. Establish monitoring and alerts. |
-| 8 | Make the premium product operational | Partial; requires owner definitions | Define paid engineering capabilities/prices/limits, enforce entitlements on the server and verify actual checkout, webhook ordering/duplicates, renewal/failure/cancellation/refund and invoice/receipt flows. |
-| 9 | Expand useful engineering calculations | Partial | Add load/torque/motor sizing and drone thrust/power/endurance with explicit assumptions and benchmark cases. Broader mechanisms and circuit connectivity follow. |
-| 10 | Add live AI and team workflows | Partial; advanced work not started | Acceptance-test existing AI explanations/shares, then add validated prompt-to-model previews/rollback, invitations, roles and comments. Real-time concurrent editing needs a separate conflict strategy. |
+| 6 | Validate engineering properties and manufacturing handoff | Mesh screening, mass/centroid estimates and independent STL/OBJ parser checks delivered; process/material acceptance remains | Add density-based mass/centre of mass and tolerances; mesh diagnostics and actual external slicer/CAD import checks. Decide the exact BREP/STEP architecture separately. |
+| 7 | Activate a private cloud beta | On hold at owner request; host/domain pending | Deploy API/PostgreSQL/HTTPS and worker; verify real auth/email/OAuth, profiles, cross-device saves, conflicts, migrations/rollback and backup restoration. Establish monitoring and alerts. |
+| 8 | Make the premium product operational | Free/Pro split and backend gates implemented; prices/provider activation pending | Define paid engineering capabilities/prices/limits, enforce entitlements on the server and verify actual checkout, webhook ordering/duplicates, renewal/failure/cancellation/refund and invoice/receipt flows. |
+| 9 | Expand useful engineering calculations | Beam/shaft/drone analytical models delivered; broader validated simulation remains | Add load/torque/motor sizing and drone thrust/power/endurance with explicit assumptions and benchmark cases. Broader mechanisms and circuit connectivity follow. |
+| 10 | Add live AI and team workflows | Guarded modelling proposals and in-app teams implemented locally; live services/shared canvas remain | Acceptance-test existing AI explanations/shares, then add validated prompt-to-model previews/rollback, invitations, roles and comments. Real-time concurrent editing needs a separate conflict strategy. |
 | 11 | Scope larger platform tracks separately | Not started | Validated FEA/thermal, full circuit simulation, PCB design, flight dynamics, verified manufacturer libraries and marketplace/public gallery each need an agreed scope and independent validation. |
 
 Order 7 service provisioning can proceed alongside CAD work when infrastructure is available. Order 8 depends on cloud acceptance and the owner's paid-feature choices. Order 11 is optional expansion, not a prerequisite for a useful modelling beta. Publishing/access changes remain with the owner.
@@ -65,7 +67,7 @@ The requested first batch is implemented. Next priorities within CAD are richer 
 
 ## Evidence and boundaries
 
-Latest v10 validation: **32 desktop/phone browser tests passed**, **all JavaScript suites passed**, and **92 API tests passed**. Coverage includes the original flows and new group/measurement/import/library/constraint/solid-operation/joint workflows. Remote CI remains unverified. See V10_WORKSPACE_REVIEW.md for limits.
+Latest v11 validation: **40 desktop/phone browser tests passed**, **all JavaScript suites passed**, and **104 API tests passed**. Independent STL/OBJ parser checks also passed. Coverage includes the original flows and new group/measurement/import/library/constraint/solid-operation/joint workflows. Remote CI remains unverified. See V10_WORKSPACE_REVIEW.md for limits.
 
 Real payment/email/OAuth/AI calls, production PostgreSQL/container/TLS acceptance and backup restoration are not proven by mocked/synthetic local tests. No overall completion percentage or delivery date is assigned because the remaining scope contains separate CAD, infrastructure and engineering projects.
 

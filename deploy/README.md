@@ -1,8 +1,10 @@
 # Production deployment
 
+Cloud activation is on hold at the owner’s request (23 October 2026). Run `python scripts/deployment-check.py` for a redacted local preflight. Apply migration 0003 before running the team-enabled API; production health checks migrations 0001–0003. No host/domain or provider accounts have been provisioned. See FREE_AND_PRO.md and V11_AUDIT.md in the repository root.
+
 The existing Sites URL serves the static preview. This deployment runs the Python API, the same frontend, PostgreSQL, a separate operational worker and HTTPS on a server you control. No server, domain, email account or payment credential has been provisioned by adding these files.
 
-1. Prepare a Linux host with Docker Compose, a domain pointing to it and ports 80/443 available. Back up any existing database before upgrading. Review `api/migrations/0002_project_lifecycle.sql`.
+1. Prepare a Linux host with Docker Compose, a domain pointing to it and ports 80/443 available. Back up any existing database before upgrading. Review `api/migrate.py and the additive 0003 collaboration tables`.
 2. Create a private `.env.production` in the repository root using `api/.env.example`. Set `APP_ENV=production`, `APP_ORIGIN=https://your-domain`, `DATABASE_URL=postgresql+psycopg://studio:ENCODED_PASSWORD@database/studio`, a random JWT key, a Fernet key and real SMTP settings. Use the deployment secret store in a managed environment. Never commit this file. The database password in the URL must be URL-encoded if it contains reserved characters.
 3. In your shell/deployment environment set `STUDIO_DOMAIN` and `DB_PASSWORD` to match the domain and database credentials. Run `docker compose -f deploy/compose.yml config --quiet` before launching. Do not log expanded configuration because it contains secrets.
 4. Run `docker compose -f deploy/compose.yml up --build -d`. The explicit migration job applies the additive schema upgrade before API and worker startup. PostgreSQL migrations use an advisory lock. A failed migration prevents dependent service startup. Review backups and schema changes before production rollout.
@@ -14,6 +16,6 @@ Optional AI: set `AI_ENABLED=true`, `OPENAI_API_KEY` and `OPENAI_MODEL` using a 
 
 Optional sharing: set `SHARING_ENABLED=true` only after reviewing the site's sharing requirements. Owners explicitly create a snapshot link expiring in 1–30 days. Anyone holding the link can read its included notes, components and specifications. The token is stored only as a hash. Owners can revoke it. Trashing a project revokes all its links, and restoring the project does not reopen them. This is separate from the private Sites audience; enabling a Python service does not change Sites sharing permissions.
 
-Billing remains disabled until Premium scope, prices and real Stripe test-mode acceptance checks are complete. A Docker volume is persistence, not a backup. Establish scheduled encrypted PostgreSQL backups, retention, restoration rehearsals, alerting and secret rotation for the actual deployment. No production backups or external jobs were created here.
+The Free/Pro scope is defined; billing remains disabled until final prices and real Stripe sandbox acceptance are complete. Keep ALLOW_LIVE_BILLING=false during testing. A Docker volume is persistence, not a backup. Establish scheduled encrypted PostgreSQL backups, retention, restoration rehearsals, alerting and secret rotation for the actual deployment. No production backups or external jobs were created here.
 
 Validation on the Windows development host covers Python/JavaScript checks and local API/browser flows. Docker is not installed on this host, so container builds, Compose startup, Caddy TLS and PostgreSQL migration/concurrency behavior remain staging acceptance checks.

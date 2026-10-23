@@ -5,7 +5,7 @@ const StudioSolidEditor=(()=>{
     let exactProfileError=false,submitting=false,rebuildTicket=0,active=-1,vertex=-1,drawing=false,preview=null,renderer=null,controls=null,raf=null,disposed=false;
     let view=[-60,-40,120,80];
     const input=(id,label,value,min=-5000,max=5000)=>`<label>${label}<input id="${id}" type="number" step="0.1" min="${min}" max="${max}" value="${value}"></label>`;
-    modal(options.model?'Edit custom solid':'Create a custom solid',`
+    modal(options.model&&!options.isNew?'Edit custom solid':'Create a custom solid',`
       <p class="solidIntro">Draw a closed profile, extrude it, then cut or join features. U/V are profile coordinates; W is the extrusion direction. All dimensions are millimetres.</p>
       <div class="solidBaseFields"><label>Part name<input id="solidName" maxlength="80" value="${esc(draft.name)}" required></label><label>Work plane<select id="solidPlane"><option value="XZ">XZ · depth along +Y</option><option value="XY">XY · depth along +Z</option><option value="YZ">YZ · depth along +X</option></select></label>${input('solidDepth','Extrusion depth mm',draft.depth,.1)}</div>
       <details class="solidAdvanced"><summary>Base operation · extrude / revolve / taper / twist</summary><div class="solidBaseFields"><label>Base operation<select id="solidBaseType"><option value="extrude">Extrude</option><option value="revolve">Revolve around V → W axis</option></select></label>${input('solidAngle','Revolve angle °',draft.model.base?.angle||360,1,360)}${input('solidTwist','Extrusion twist °',draft.model.base?.twist||0,-360,360)}${input('solidScale','Extrusion top scale',draft.model.base?.scale||1,.1,4)}</div><p class="tiny">Revolve uses U ≥ 0 as radius and V as axial height. W is its resulting axis. Through-all tools require extrusion. Curves and circles use polygon approximations.</p></details>
@@ -22,7 +22,7 @@ const StudioSolidEditor=(()=>{
     const dialog=$('#dialog');dialog.classList.add('solidModelDialog');
     $('#solidPlane').value=draft.model.plane;
     $('#solidBaseType').value=draft.model.base?.type||'extrude';
-    const submit=$('#modalForm>button[type=submit]');submit.textContent=options.model?'Save solid changes':'Add solid to assembly';
+    const submit=$('#modalForm>button[type=submit]');submit.textContent=options.model&&!options.isNew?'Save solid changes':'Add solid to assembly';
     const error=message=>{$('#solidError').textContent=message||'';$('#solidPreview').classList.toggle('stale',!!message)};
     function fitProfile(){const p=draft.model.outline;if(!p.length)return;const xs=p.map(v=>v[0]),ys=p.map(v=>v[1]),w=Math.max(100,Math.max(...xs)-Math.min(...xs)+24),h=Math.max(70,Math.max(...ys)-Math.min(...ys)+24),cx=(Math.max(...xs)+Math.min(...xs))/2,cy=(Math.max(...ys)+Math.min(...ys))/2;view=[cx-w/2,-cy-h/2,w,h];}
     function profileMarkup(){
