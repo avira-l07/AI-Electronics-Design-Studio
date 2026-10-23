@@ -83,6 +83,7 @@
   let objects = [];          // placed scene objects
   let selId = null;          // selected id
   let selectedIds=new Set(),assemblyGroups=[],assemblyJoints=[],multiPivot=null,measurePoints=[],measureMode=false,measureLine=null;
+  let facePicking=false;
   let mode = 'orbit';        // 'orbit' | 'select'
   let gridHelper = null, raycaster = null, vpObserver = null;
   let editorReady = false;
@@ -100,6 +101,7 @@
     if(p.id==='imported_mesh'&&!StudioMeshParts.validate(p.mesh))throw Error('Invalid imported mesh.');
     const root=new window.THREE.Group();root.add(buildGeometry(p));return root;
   }
+  window.Studio3DAssets={ready:ensureThree,build:record=>build({...structuredClone(record),id:record.partId,mat:record.material})};
   function ring(outer,inner,length,mat,sides=48){
     const T=window.THREE,shape=new T.Shape();
     if(sides===6){for(let i=0;i<6;i++){const a=i*Math.PI/3,x=outer*Math.cos(a),y=outer*Math.sin(a);i?shape.lineTo(x,y):shape.moveTo(x,y);}shape.closePath();}
@@ -334,7 +336,7 @@
       `<button id="${id}" class="${active}" title="${label}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${svgPath}"/></svg> ${label}</button>`;
 
     return `
-<div class="v3dCreateBar"><button class="primary" id="startCustomSolid">＋ Draw your own 3D part</button><button id="openMeshImport">Import STL / OBJ</button><button id="openPersonalParts">My reusable parts</button><button id="inspectManufacturing">Inspect & mass</button><button id="engineeringLab">Calculation lab</button><button id="projectServices">AI & team</button><a href="#/templates">Browse assembly starters →</a></div><p class="v3dDisclaimer">Custom solids retain editable modelling recipes. Catalogue and imported parts are concept meshes. Reference exports: visible parts, mm, Z-up. Use Inspect & mass for topology checks and density-based estimates; external manufacturing review is still required.</p>${assemblyGuide()}<div class="editor3d" id="editor3d">
+<div class="v3dCreateBar"><button class="primary" id="startCustomSolid">＋ Draw your own 3D part</button><button id="openMeshImport">Import STL / OBJ</button><button id="openPersonalParts">My reusable parts</button><button id="inspectManufacturing">Inspect & mass</button><button id="manufacturingTools">Fit & mesh tools</button><button id="faceWorkPlane">Model on a face</button><button id="engineeringLab">Calculation lab</button><button id="projectServices">AI & team</button><a href="#/templates">Browse assembly starters →</a></div><p class="v3dDisclaimer">Custom solids retain editable modelling recipes. Catalogue and imported parts are concept meshes. Reference exports: visible parts, mm, Z-up. Use Inspect & mass for topology checks and density-based estimates; external manufacturing review is still required.</p>${assemblyGuide()}<div class="editor3d" id="editor3d">
 
   <!-- Toolbar -->
   <div class="editor3d-toolbar">
@@ -603,18 +605,18 @@
   }
 
   /* ─── Object Placement ───────────────────────────────────────── */
-  async function modelPart(id){
+  async function modelPart(id,frame){
     if(sceneBlocked||!editorReady||current?.id!==loadedProjectId)return _toast('Open a project in the 3D editor first.');
     const rec=id?objects.find(o=>o.id===id):null,project=current.id;
     if(id&&!rec?.def.model)return _toast('Select a custom solid to edit its profile and features.');
     if(!rec&&objects.length>=200)return _toast('Assemblies support up to 200 parts.');
     try{await ensureSolids();if(current.id!==project||!isActive())return;
-      StudioSolidEditor.open({model:rec?.def.model,depth:rec?.def.dims.depth,name:rec?.name,onCommit:draft=>{
+      StudioSolidEditor.open({model:frame?{...StudioSolidModel.defaultModel(),frame}:rec?.def.model,isNew:!!frame,depth:rec?.def.dims.depth,name:rec?.name,onCommit:draft=>{
         if(current.id!==project||sceneBlocked)throw Error('The active project changed. Reopen the modeller.');
         const def={...structuredClone(rec?.def||ALL_PARTS.find(p=>p.id==='custom_solid')),model:draft.model,dims:{depth:draft.depth}},obj3d=build(def);
         assembledView();
         if(rec){obj3d.position.copy(rec.obj3d.position);obj3d.rotation.copy(rec.obj3d.rotation);scene.remove(rec.obj3d);disposeObject(rec.obj3d);rec.obj3d=obj3d;rec.def=def;rec.name=draft.name;applyRecordAppearance(rec);scene.add(obj3d);select(rec.id);}
-        else{const T=window.THREE,bounds=new T.Box3().setFromObject(obj3d);obj3d.position.y=-bounds.min.y;if(objects.length){const occupied=new T.Box3();objects.forEach(o=>occupied.union(new T.Box3().setFromObject(o.obj3d)));obj3d.position.x=occupied.max.x-bounds.min.x+1;}const record={id:uid(),name:draft.name,def,obj3d,visible:true,wireframe:false};applyRecordAppearance(record);objects.push(record);scene.add(obj3d);select(record.id);}
+        else{const T=window.THREE,bounds=new T.Box3().setFromObject(obj3d);if(!draft.model.frame)obj3d.position.y=-bounds.min.y;if(objects.length&&!draft.model.frame){const occupied=new T.Box3();objects.forEach(o=>occupied.union(new T.Box3().setFromObject(o.obj3d)));obj3d.position.x=occupied.max.x-bounds.min.x+1;}const record={id:uid(),name:draft.name,def,obj3d,visible:true,wireframe:false};applyRecordAppearance(record);objects.push(record);scene.add(obj3d);select(record.id);}
         updateEmpty();refreshAsm();refreshBom();saveScene();fitAssembly();_toast('Custom solid saved with editable profile and feature history.');
       }});
     }catch(e){_toast(e.message);}
@@ -748,7 +750,7 @@
   }
 
   function pick(e) {
-    if(!measureMode&&mode==='orbit'||transformControls?.dragging||['move','rotate'].includes(mode)&&transformControls?.axis||!raycaster||!camera)return;
+    if(!measureMode&&!facePicking&&mode==='orbit'||transformControls?.dragging||['move','rotate'].includes(mode)&&transformControls?.axis||!raycaster||!camera)return;
     const canvas = document.getElementById('v3dCanvas');
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -762,6 +764,7 @@
     });
     const hits = raycaster.intersectObjects(meshes, false);
     if (hits.length) {
+      if(facePicking){facePicking=false;const T=window.THREE,hit=hits[0],normal=hit.face.normal.clone().applyMatrix3(new T.Matrix3().getNormalMatrix(hit.object.matrixWorld)).normalize(),helper=Math.abs(normal.y)<.9?new T.Vector3(0,1,0):new T.Vector3(1,0,0),u=new T.Vector3().crossVectors(helper,normal).normalize(),v=new T.Vector3().crossVectors(normal,u).normalize();modelPart(null,{origin:hit.point.clone().multiplyScalar(10).toArray(),u:u.toArray(),v:v.toArray()});return;}
       if(measureMode){measurePoints.push(hits[0].point.clone());if(measurePoints.length>2)measurePoints.shift();drawMeasurement();renderAssemblyTools();return;}
       const hit = hits[0].object;
       const rec = objects.find(o => {
@@ -1227,7 +1230,7 @@
     const on = (id, fn) => { const el = document.getElementById(id); if(el)el.onclick=fn; };
     on('openMeshImport',openMeshImport);on('openPersonalParts',openPersonalParts);renderAssemblyTools();
     on('inspectManufacturing',inspectManufacturing);on('engineeringLab',()=>StudioEngineering.open());on('projectServices',()=>StudioServices.open({modelPart: draft=>insertRecord({id:uid(),partId:'custom_solid',name:draft.name,dims:{depth:draft.depth},model:draft.model,material:'Aluminium 6061',position:[0,0,0],rotation:[0,0,0],visible:true,wireframe:false})}));
-    on('tb-model',()=>modelPart());on('startCustomSolid',()=>modelPart());on('tb-edit-model',()=>selId?modelPart(selId):_toast('Select a custom solid first.'));
+    on('tb-model',()=>modelPart());on('startCustomSolid',()=>modelPart());on('faceWorkPlane',()=>{facePicking=true;measureMode=false;assembledView();setMode('select');_toast('Click a mesh face. The picked triangle normal defines a saved, independent work plane.');});on('manufacturingTools',()=>{try{StudioManufacturingTools.open(manufacturingRecords(),async part=>insertRecord({id:uid(),partId:'imported_mesh',name:part.name,dims:{scale:1},mesh:part.mesh,material:part.material,position:[0,0,0],rotation:[0,0,0],visible:true,wireframe:false}));}catch(e){_toast(e.message);}});on('tb-edit-model',()=>selId?modelPart(selId):_toast('Select a custom solid first.'));
     on('tb-move',()=>setMode('move'));on('tb-rotate',()=>setMode('rotate'));const snap=document.getElementById('tb-snap');if(snap)snap.onchange=e=>{snapTransforms=e.target.checked;syncTransformHandles()};
     const stage=document.getElementById('droneStage');if(stage)stage.onchange=e=>setAssemblyStage(Number(e.target.value));
     on('dronePrevious',()=>setAssemblyStage(assemblyStage-1));on('droneNext',()=>setAssemblyStage(assemblyStage+1));on('droneComplete',()=>setAssemblyStage(6));refreshAssemblyGuide();
@@ -1316,7 +1319,7 @@
       if(!isActive()||!editorReady||document.getElementById('dialog')?.open||e.target.isContentEditable)return;
       if (e.target.closest('input, textarea, select')) return;
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); delSelected(); }
-      else if (e.key === 'Escape') { select(null); }
+      else if (e.key === 'Escape') { facePicking=false;select(null); }
       else if (e.key === '1') { setCam('top'); }
       else if (e.key === '2') { setCam('front'); }
       else if (e.key === '3') { setCam('iso'); }

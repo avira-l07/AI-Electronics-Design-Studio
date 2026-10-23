@@ -1,7 +1,7 @@
 """Explicit additive schema upgrade; never run implicitly on a web request."""
 from sqlalchemy import inspect, text
 from api.config import Settings
-from api.models import Base, Share, ProjectMember, ProjectComment, database, seed
+from api.models import Base, Share, ProjectMember, ProjectComment, ProjectPresence, database, seed
 
 def migrate():
     s=Settings();s.validate();engine,Factory=database(s.database_url)
@@ -18,10 +18,11 @@ def migrate():
             Share.__table__.create(conn,checkfirst=True)
             ProjectMember.__table__.create(conn,checkfirst=True)
             ProjectComment.__table__.create(conn,checkfirst=True)
+            ProjectPresence.__table__.create(conn,checkfirst=True)
         conn.execute(text('CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(30) PRIMARY KEY)'))
-        for version in ['0001','0002','0003']:
+        for version in ['0001','0002','0003','0004']:
             if not conn.scalar(text('SELECT version FROM schema_migrations WHERE version=:version'),{'version':version}):conn.execute(text('INSERT INTO schema_migrations(version) VALUES (:version)'),{'version':version})
     with Factory.begin() as db:seed(db)
-    engine.dispose();print('Schema ready at version 0003.')
+    engine.dispose();print('Schema ready at version 0004.')
 
 if __name__=='__main__':migrate()

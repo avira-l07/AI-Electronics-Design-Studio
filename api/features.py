@@ -4,7 +4,7 @@ import httpx
 from fastapi import Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select,delete
-from api.models import Project, Share, Audit, ProjectMember, now
+from api.models import Project, Share, Audit, ProjectMember, ProjectPresence, now
 from api.security import require_profile, require_admin, digest, random_token, fail, audit, limit
 
 class VersionInput(BaseModel):
@@ -61,7 +61,7 @@ def install_features(app,auth,db_session):
             db.execute(select(1))
             if s.environment=='production':
                 versions=set(db.execute(text('SELECT version FROM schema_migrations')).scalars())
-                if not {'0001','0002','0003'}<=versions:fail(503,'Database migration required')
+                if not {'0001','0002','0003','0004'}<=versions:fail(503,'Database migration required')
         except SQLAlchemyError:fail(503,'Database unavailable or migration required')
         return {'status':'ok'}
     @app.delete('/api/projects/{id}')
@@ -69,6 +69,7 @@ def install_features(app,auth,db_session):
         row=owned(db,who,id);check_version(row,body.version)
         row.trashed=True;row.version+=1;row.updated=now()
         db.execute(delete(ProjectMember).where(ProjectMember.project_id==id))
+        db.execute(delete(ProjectPresence).where(ProjectPresence.project_id==id))
         for share in db.scalars(select(Share).where(Share.project_id==id)):share.revoked=True
         audit(db,who[0],'project.trashed');return {'trashed':True,'version':row.version}
     @app.post('/api/projects/{id}/restore')

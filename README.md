@@ -1,6 +1,8 @@
 # AI Engineering Design Studio
 
-Current v11: [implementation audit](V11_AUDIT.md) and [Free/Pro split](FREE_AND_PRO.md). Adds mesh inspection/mass estimates, beam/shaft/drone calculation tools, guarded AI model proposals and opt-in team APIs/UI. Cloud deployment is on hold at the owner’s request; live payment/AI services are not activated.
+Current v12: [delivery audit](V12_AUDIT.md), [current checklist](PRIORITY_CHECKLIST.md) and [Free/Pro split](FREE_AND_PRO.md). Adds shared 3D presence/object merging, analytic curve recipes, nonlinear point/segment constraints, face-plane snapshots, bounded shell/sweep/loft/corner operations, manufacturing review tools and expanded analytical models. 52 browser cases and 108 API tests passed; 14 export files passed independent parsing. Cloud deployment is held; real devices, external CAD/slicers and physical acceptance remain unverified.
+
+Historical milestone notes below describe their original scope; V12_AUDIT.md is the current status.
 
 Browser-local engineering concept workspace. Serve `dist/` using any static HTTP server.
 

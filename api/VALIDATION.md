@@ -1,3 +1,7 @@
+v12 current: **108 API tests passed**, **52 browser cases passed**, all JS suites and **14 independent STL/OBJ export checks passed**. Includes actual loopback multi-account browser sessions, object-level merging, presence expiry/revocation/deletion, JS/Python curve/construction schema parity, repeatable migration 0004 and the async middleware lock-wait fix. Cloud, physical devices, real providers and physical manufacturing remain unverified. See `../V12_AUDIT.md`.
+
+Historical validation notes:
+
 v11 follow-up: **104 API tests passed**, with role/revocation/downgrade/Trash checks, privacy deletion, AI quota/schema controls, live-billing guards and repeatable migration 0003. All JS suites, 40 local browser cases and independent STL/OBJ parser checks pass. Cloud activation is held; real providers remain unconfigured. See `../V11_AUDIT.md`.
 
 v10 follow-up, 23 October 2026: **92 API tests passed**. Added imported-mesh/group/joint project and snapshot round-trip plus malformed asset, graph, constraint and modifier rejection. All JavaScript suites and 32 local desktop/phone browser tests passed. Remote CI and real production services remain separate. See `../V10_WORKSPACE_REVIEW.md`.

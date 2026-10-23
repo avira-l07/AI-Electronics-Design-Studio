@@ -2,8 +2,9 @@
 import json
 from fastapi import Depends,Query
 from pydantic import BaseModel,ConfigDict,EmailStr,Field
-from sqlalchemy import select,func
-from api.models import Project,ProjectMember,ProjectComment,User,now
+from sqlalchemy import select,func,delete
+from api.models import Project,ProjectMember,ProjectComment,ProjectPresence,Session,User,now
+from api.assembly_data import validate_assembly
 from api.security import require_profile,fail,limit,audit,effective_plan
 from api.product import require_feature
 from api.project_data import project_data
@@ -15,6 +16,15 @@ class Invite(BaseModel):
 class CommentInput(BaseModel):
     model_config=ConfigDict(extra='forbid')
     body:str=Field(min_length=1,max_length=2000)
+class PresenceInput(BaseModel):
+    model_config=ConfigDict(extra='forbid',strict=True)
+    client_id:str=Field(pattern=r'^[a-zA-Z0-9_-]{1,64}$')
+    selected:str|None=Field(default=None,max_length=80)
+class AssemblyEdit(BaseModel):
+    model_config=ConfigDict(extra='forbid',strict=True)
+    # Object compare-and-swap, independent of unrelated project edits.
+    before:list[dict]=Field(min_length=1,max_length=20)
+    after:list[dict]=Field(min_length=1,max_length=20)
 
 def install_collaboration(app,auth,db_session):
     s=app.state.settings
@@ -54,6 +64,46 @@ def install_collaboration(app,auth,db_session):
         row,_=access(db,who,id,write=True)
         if type(body.get('version'))!=int or body['version']!=row.version:fail(409,'A newer version exists. Fetch it before editing; no overwrite occurred.')
         row.data=project_data(body);row.version+=1;row.updated=now();audit(db,who[0],'team.project.updated');return {'version':row.version}
+    @app.patch('/api/team/projects/{id}/assembly')
+    def merge_assembly(id:str,body:AssemblyEdit,who=Depends(auth),db=Depends(db_session)):
+        row,role=access(db,who,id,write=True)
+        if role=='owner':require_feature(db,s,who[0],'team_projects')
+        limit(db,'team-edit:'+who[0].id,240,60)
+        data=json.loads(row.data);assembly=data.get('assembly3d')
+        if not assembly:fail(409,'This project has no shared assembly yet.')
+        if any(not isinstance(v.get('id'),str) for v in body.before+body.after):fail(422,'Part IDs must be strings.')
+        before={v.get('id'):v for v in body.before};after={v.get('id'):v for v in body.after}
+        if len(before)!=len(body.before) or set(before)!=set(after) or len(after)!=len(body.after) or any(not isinstance(k,str) for k in before):fail(422,'Use matching, unique part IDs.')
+        current={v['id']:v for v in assembly['objects']}
+        if any(k not in current or current[k]!=v for k,v in before.items()):fail(409,'A selected part changed. Refresh and review your draft; nothing was overwritten.')
+        linked={j[k] for j in assembly.get('joints',[]) for k in ['parent','child']}
+        for key,value in after.items():
+            # Kinematic groups need a shared solver; never detach or corrupt them silently.
+            if key in linked:fail(409,'Joint-linked parts must be edited in the owner workspace.')
+            if any(value.get(k)!=before[key].get(k) for k in set(value)|set(before[key]) if k not in ['name','position','rotation','visible','wireframe']):fail(422,'Shared edits support name, transform and visibility only.')
+        assembly['objects']=[after.get(v['id'],v) for v in assembly['objects']]
+        validate_assembly(assembly);row.data=project_data(data);row.version+=1;row.updated=now();audit(db,who[0],'team.assembly.merged')
+        return {'project':{**json.loads(row.data),'id':row.id,'version':row.version},'role':role}
+    @app.post('/api/team/projects/{id}/presence')
+    def presence(id:str,body:PresenceInput,who=Depends(auth),db=Depends(db_session)):
+        row,role=access(db,who,id)
+        if role=='owner':require_feature(db,s,who[0],'team_projects')
+        limit(db,'team-presence:'+who[0].id,120,60)
+        ids={v['id'] for v in json.loads(row.data).get('assembly3d',{}).get('objects',[])}
+        if body.selected is not None and body.selected not in ids:fail(422,'Selected part no longer exists.')
+        # Short-lived rows; a crashed tab expires without a leave message.
+        db.execute(delete(ProjectPresence).where(ProjectPresence.updated<now()-60))
+        key=(id,who[1].id,body.client_id);entry=db.get(ProjectPresence,key)
+        if not entry:
+            if db.scalar(select(func.count()).select_from(ProjectPresence).where(ProjectPresence.project_id==id,ProjectPresence.session_id==who[1].id))>=8:fail(429,'Use at most eight shared tabs per session.')
+            entry=ProjectPresence(project_id=id,session_id=who[1].id,client_id=body.client_id,user_id=who[0].id);db.add(entry)
+        entry.selected=body.selected;entry.updated=now();db.flush()
+        rows=db.execute(select(ProjectPresence,User,Session).join(User,User.id==ProjectPresence.user_id).join(Session,Session.id==ProjectPresence.session_id).where(ProjectPresence.project_id==id,ProjectPresence.updated>=now()-20,Session.revoked==False,Session.expires>now(),User.deleted==False,User.banned==False)).all()
+        grants={m.user_id for m in db.scalars(select(ProjectMember).where(ProjectMember.project_id==id,ProjectMember.accepted==True))}
+        return {'version':row.version,'role':role,'peers':[{'name':u.name,'selected':p.selected,'self':p.session_id==who[1].id and p.client_id==body.client_id} for p,u,_ in rows if u.id==row.user_id or u.id in grants]}
+    @app.delete('/api/team/projects/{id}/presence/{client_id}')
+    def leave(id:str,client_id:str,who=Depends(auth),db=Depends(db_session)):
+        db.execute(delete(ProjectPresence).where(ProjectPresence.project_id==id,ProjectPresence.session_id==who[1].id,ProjectPresence.client_id==client_id));return {'left':True}
     @app.get('/api/team/projects/{id}/members')
     def members(id:str,who=Depends(auth),db=Depends(db_session)):
         access(db,who,id,owner_only=True)
@@ -73,6 +123,7 @@ def install_collaboration(app,auth,db_session):
     def revoke(id:str,user_id:str,who=Depends(auth),db=Depends(db_session)):
         access(db,who,id,owner_only=True);member=db.get(ProjectMember,(id,user_id))
         if member:db.delete(member)
+        db.execute(delete(ProjectPresence).where(ProjectPresence.project_id==id,ProjectPresence.user_id==user_id))
         audit(db,who[0],'team.member.revoked');return {'revoked':True}
     @app.get('/api/team/projects/{id}/comments')
     def comments(id:str,offset:int=Query(0,ge=0),who=Depends(auth),db=Depends(db_session)):

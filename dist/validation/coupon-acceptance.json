@@ -1,0 +1,43 @@
+{
+  "name": "coupon",
+  "volumeMm3": 2859.0317124023445,
+  "bounds": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      30,
+      20,
+      5
+    ]
+  ],
+  "units": "mm",
+  "upAxis": "Z",
+  "nominalDimensionsMm": [
+    30,
+    20,
+    5
+  ],
+  "nominalHoleDiameterMm": 6,
+  "profileCircleFacets": 48,
+  "software": {
+    "name": null,
+    "version": null,
+    "importedUnits": null,
+    "measuredDimensionsMm": null,
+    "meshIssues": null,
+    "toolpathReviewed": false
+  },
+  "physical": {
+    "machine": null,
+    "materialGrade": null,
+    "processSettings": null,
+    "measurementInstrument": null,
+    "measurementsMm": null,
+    "chosenToleranceMm": null,
+    "accepted": false
+  },
+  "manufacturingAccepted": false
+}

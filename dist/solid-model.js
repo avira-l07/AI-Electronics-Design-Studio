@@ -11,8 +11,8 @@ const StudioSolidModel=(()=>{
     const on=(a,b,c)=>Math.abs(orient(a,b,c))<1e-8&&c[0]>=Math.min(a[0],b[0])-1e-8&&c[0]<=Math.max(a[0],b[0])+1e-8&&c[1]>=Math.min(a[1],b[1])-1e-8&&c[1]<=Math.max(a[1],b[1])+1e-8;
     return orient(a,b,c)*orient(a,b,d)<0&&orient(c,d,a)*orient(c,d,b)<0||on(a,b,c)||on(a,b,d)||on(c,d,a)||on(c,d,b);
   }
-  function profileError(points){
-    if(!Array.isArray(points)||points.length<3||points.length>64||points.some(p=>!Array.isArray(p)||p.length!==2||!p.every(v=>number(v))))return 'Use 3–64 vertices, each with two finite coordinates within ±5000 mm.';
+  function profileError(points,maximum=64){
+    if(!Array.isArray(points)||points.length<3||points.length>maximum||points.some(p=>!Array.isArray(p)||p.length!==2||!p.every(v=>number(v))))return 'Use 3–64 vertices, each with two finite coordinates within ±5000 mm.';
     let area=0;
     for(let i=0;i<points.length;i++){
       const a=points[i],b=points[(i+1)%points.length];
@@ -29,7 +29,14 @@ const StudioSolidModel=(()=>{
     return exact(f.dims,keys)&&Object.values(f.dims).every(v=>number(v)&&v>=.1)&&(!f.through||f.operation==='subtract'&&f.rotation[0]===0&&f.rotation[1]===0);
   }
   function validate(m,depth){
-    if(!obj(m)||!['version','plane','outline','features'].every(k=>Object.hasOwn(m,k))||Object.keys(m).some(k=>!['version','plane','outline','features','base','constraints','modifiers'].includes(k))||m.version!==1||!['XZ','XY','YZ'].includes(m.plane)||!number(depth)||depth<.1||profileError(m.outline)||!Array.isArray(m.features)||m.features.length>16)return false;
+    if(!obj(m)||!['version','plane','outline','features'].every(k=>Object.hasOwn(m,k))||Object.keys(m).some(k=>!['version','plane','outline','features','base','constraints','modifiers','curves','construction','frame'].includes(k))||m.version!==1||!['XZ','XY','YZ'].includes(m.plane)||!number(depth)||depth<.1||profileError(m.outline)||!Array.isArray(m.features)||m.features.length>16)return false;
+    let sampled=m.outline;try{if(m.curves!==undefined){sampled=StudioSketch.sample(m.outline,m.curves);if(profileError(sampled,128))return false;}}catch{return false;}
+    if(m.frame!==undefined){const f=m.frame;if(!exact(f,['origin','u','v'])||!vector(f.origin)||!vector(f.u,1)||!vector(f.v,1)||Math.abs(Math.hypot(...f.u)-1)>1e-6||Math.abs(Math.hypot(...f.v)-1)>1e-6||Math.abs(f.u.reduce((n,v,i)=>n+v*f.v[i],0))>1e-6)return false;}
+    if(m.construction!==undefined){const c=m.construction;if(!obj(c)||m.base&&m.base.type!=='extrude'||m.base&&(m.base.twist!==0||m.base.scale!==1))return false;
+     if(c.type==='shell'){if(!exact(c,['type','thickness'])||!number(c.thickness)||c.thickness<.1||c.thickness>=depth)return false;}
+     else if(c.type==='loft'){if(!exact(c,['type','top','offset'])||profileError(c.top,128)||c.top.length!==sampled.length||!Array.isArray(c.offset)||c.offset.length!==2||!c.offset.every(v=>number(v)))return false;}
+     else if(c.type==='sweep'){if(!exact(c,['type','path'])||!Array.isArray(c.path)||c.path.length<2||c.path.length>16||c.path.some(v=>!vector(v))||c.path[0].some(v=>v!==0)||c.path.at(-1)[2]!==depth||c.path.some((v,i)=>i&&v[2]-c.path[i-1][2]<.1))return false;}else return false;
+    }
     if(m.constraints!==undefined&&(!StudioSketch.valid(m.constraints,m.outline.length)||m.constraints.some(c=>StudioSketch.residual(m.outline,c)>.005)))return false;
     if(m.base!==undefined&&(!exact(m.base,['type','angle','twist','scale'])||!['extrude','revolve'].includes(m.base.type)||!number(m.base.angle,360)||m.base.angle<1||!number(m.base.twist,360)||!number(m.base.scale,4)||m.base.scale<.1||m.base.type==='revolve'&&m.outline.some(p=>p[0]<0)))return false;
     if(m.modifiers!==undefined&&(!Array.isArray(m.modifiers)||m.modifiers.length>4||m.modifiers.some(f=>f?.type==='mirror'?!exact(f,['type','axis'])||!['U','V','W'].includes(f.axis):f?.type==='pattern'?!exact(f,['type','count','step'])||!Number.isInteger(f.count)||f.count<2||f.count>8||!vector(f.step)||Math.hypot(...f.step)<.1:true)))return false;
@@ -71,9 +78,26 @@ const StudioSolidModel=(()=>{
     if(!kernel){const result=cache.get(recipeKey(model,depth));if(result)return result;throw Error('The solid needs to be rebuilt before it can be displayed.');}
     const allocated=[],keep=o=>{allocated.push(o);return o;};
     try{
-      const section=keep(new kernel.CrossSection([model.outline.map(([x,y])=>({x,y}))],'NonZero'));
+      const profile=model.curves?StudioSketch.sample(model.outline,model.curves):model.outline;
+      const section=keep(new kernel.CrossSection([profile.map(([x,y])=>({x,y}))],'NonZero'));
       const base=model.base||{type:'extrude',twist:0,scale:1};
       let solid=keep(base.type==='revolve'?section.revolve(96,base.angle):section.extrude(depth,base.twist?32:0,base.twist,{x:base.scale,y:base.scale}));
+      const construction=model.construction;
+      if(construction?.type==='shell'){const inner=keep(section.offset(-construction.thickness,'Miter',2,32));if(inner.isEmpty()||inner.area()<.01)throw Error('Wall thickness consumes the profile.');const cavity=keep(inner.extrude(depth,0,0,{x:1,y:1}));const moved=keep(cavity.translate({x:0,y:0,z:construction.thickness}));solid=keep(solid.subtract(moved));}
+      else if(construction){
+       let bottom=profile.map(p=>[...p]),top=construction.type==='loft'?construction.top.map(p=>[...p]):null;
+       const area=ps=>ps.reduce((a,p,i)=>a+p[0]*ps[(i+1)%ps.length][1]-p[1]*ps[(i+1)%ps.length][0],0);
+       if(area(bottom)<0){bottom.reverse();top?.reverse();}
+       const convex=ps=>ps.every((p,i)=>orient(p,ps[(i+1)%ps.length],ps[(i+2)%ps.length])>=-1e-7);
+       if(!convex(bottom)||top&&(!convex(top)||area(top)<=0))throw Error('Sweep/loft currently require convex profiles with matching vertex order.');
+       const rings=construction.type==='sweep'?construction.path.map(([u,v,w])=>bottom.map(p=>[p[0]+u,p[1]+v,w])):[bottom.map(p=>[...p,0]),top.map(p=>[p[0]+construction.offset[0],p[1]+construction.offset[1],depth])];
+       if(top)for(let t=1;t<16;t++){const mid=bottom.map((p,i)=>p.map((v,k)=>v+(top[i][k]-v)*t/16));if(profileError(mid,128)||!convex(mid))throw Error('Loft correspondence folds between profiles.');}
+       const count=bottom.length,vertices=new Float32Array(rings.flat(2)),indices=[],caps=kernel.triangulate([bottom.map(([x,y])=>({x,y}))]);
+       const capsTop=top?kernel.triangulate([top.map(([x,y])=>({x,y}))]):caps;
+       for(const tri of caps)indices.push(tri[2],tri[1],tri[0]);for(const tri of capsTop)indices.push(...tri.map(n=>n+(rings.length-1)*count));
+       for(let r=0;r<rings.length-1;r++)for(let i=0;i<count;i++){const a=r*count+i,b=r*count+(i+1)%count;indices.push(a,b,b+count,a,b+count,a+count);}
+       const mesh=new kernel.Mesh({numProp:3,vertProperties:vertices,triVerts:new Uint32Array(indices)});solid=keep(new kernel.Manifold(mesh));
+      }
       for(const f of model.features){
         if(!f.enabled)continue;
         const h=f.through?depth+.2:f.dims.depth;
@@ -91,7 +115,7 @@ const StudioSolidModel=(()=>{
       const positions=new Float32Array(mesh.numVert*3);
       for(let i=0;i<mesh.numVert;i++){
         const u=mesh.vertProperties[i*mesh.numProp],v=mesh.vertProperties[i*mesh.numProp+1],w=mesh.vertProperties[i*mesh.numProp+2];
-        positions.set(model.plane==='XZ'?[u,w,-v]:model.plane==='YZ'?[w,u,v]:[u,v,w],i*3);
+        const f=model.frame;if(f){const normal=[f.u[1]*f.v[2]-f.u[2]*f.v[1],f.u[2]*f.v[0]-f.u[0]*f.v[2],f.u[0]*f.v[1]-f.u[1]*f.v[0]];positions.set(f.origin.map((x,k)=>x+f.u[k]*u+f.v[k]*v+normal[k]*w),i*3);}else positions.set(model.plane==='XZ'?[u,w,-v]:model.plane==='YZ'?[w,u,v]:[u,v,w],i*3);
       }
       return {positions,indices:new Uint32Array(mesh.triVerts),volume,area,triangles:mesh.numTri};
     }finally{for(let i=allocated.length-1;i>=0;i--)allocated[i].delete();}

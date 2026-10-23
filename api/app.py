@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy import select, update, delete, func, text
 from sqlalchemy.exc import IntegrityError
@@ -60,11 +61,16 @@ def create_app(settings=None,gateway=None):
         if request.url.path.startswith('/api/') and request.method in ['POST','PATCH','DELETE'] and request.url.path!='/api/payments/webhook':
             scope=request.url.path
             if scope.startswith('/api/projects'):scope='/api/projects'
-            cap=1000 if scope=='/api/projects' else 5 if scope.endswith(('/forgot','/resend')) else 6 if scope.endswith('/signup') else 120 if scope.endswith('/refresh') else 20
-            with Factory() as guard:
-                try:
+            live=scope.startswith('/api/team/projects/') and scope.endswith(('/presence','/assembly'))
+            if live:scope='/api/team/live'
+            cap=6000 if live else 1000 if scope=='/api/projects' else 5 if scope.endswith(('/forgot','/resend')) else 6 if scope.endswith('/signup') else 120 if scope.endswith('/refresh') else 20
+            # SQLite can wait on another request's transaction. Never block the
+            # ASGI event loop: that request needs it to complete and release locks.
+            def enforce_request_limit():
+                with Factory() as guard:
                     limit(guard,ip_hash(s,request)+scope,cap);guard.commit()
-                except HTTPException as e:return JSONResponse({'detail':e.detail},e.status_code)
+            try:await run_in_threadpool(enforce_request_limit)
+            except HTTPException as e:return JSONResponse({'detail':e.detail},e.status_code)
         response=await call_next(request)
         response.headers['X-Content-Type-Options']='nosniff';response.headers['X-Frame-Options']='DENY';response.headers['Referrer-Policy']='no-referrer';response.headers['Permissions-Policy']='camera=(), microphone=(), geolocation=()'
         response.headers['Content-Security-Policy']="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
@@ -333,7 +339,7 @@ def create_app(settings=None,gateway=None):
         reauthenticate(user,body) if user.password else (None if check_otp(s,user,body.code) else fail(403,'Enable and verify a second factor before deleting a Google-only account'))
         # If provider cancellation fails, the transaction aborts; never leave a deleted user renewing silently.
         for sub in db.scalars(select(Subscription).where(Subscription.user_id==user.id,Subscription.status.not_in(['canceled','incomplete_expired']))):app.state.gateway.cancel(sub.id,immediate=True);sub.status='canceled';sub.ends=now()
-        revoke_all(db,user);db.execute(delete(ProjectComment).where(ProjectComment.user_id==user.id));db.execute(delete(ProjectMember).where(ProjectMember.user_id==user.id));db.execute(delete(Token).where(Token.user_id==user.id));db.execute(delete(Notice).where(Notice.user_id==user.id));db.execute(delete(Mail).where(Mail.user_id==user.id));db.execute(delete(Project).where(Project.user_id==user.id));db.execute(delete(Profile).where(Profile.user_id==user.id))
+        revoke_all(db,user);db.execute(delete(ProjectPresence).where(ProjectPresence.user_id==user.id));db.execute(delete(ProjectComment).where(ProjectComment.user_id==user.id));db.execute(delete(ProjectMember).where(ProjectMember.user_id==user.id));db.execute(delete(Token).where(Token.user_id==user.id));db.execute(delete(Notice).where(Notice.user_id==user.id));db.execute(delete(Mail).where(Mail.user_id==user.id));db.execute(delete(Project).where(Project.user_id==user.id));db.execute(delete(Profile).where(Profile.user_id==user.id))
         user.deleted=True;user.email='deleted-'+user.id+'@invalid.example';user.name='Deleted account';user.password=None;user.google_sub=None;user.totp=None;user.totp_pending=None;user.recovery='[]';user.checkout_url=None
         audit(db,user,'account.deleted',request,s);clear_auth(s,response);return {'deleted':True,'retained':'Pseudonymous payment and audit records are retained under the deployment retention policy.'}
 

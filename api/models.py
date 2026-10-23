@@ -89,6 +89,14 @@ class ProjectComment(Base):
     user_id: Mapped[str]=mapped_column(ForeignKey('users.id',ondelete='CASCADE'),index=True)
     body: Mapped[str]=mapped_column(String(2000))
     created: Mapped[int]=mapped_column(Integer,default=now)
+class ProjectPresence(Base):
+    __tablename__='project_presence'
+    project_id: Mapped[str]=mapped_column(ForeignKey('projects.id',ondelete='CASCADE'),primary_key=True)
+    session_id: Mapped[str]=mapped_column(ForeignKey('sessions.id',ondelete='CASCADE'),primary_key=True)
+    client_id: Mapped[str]=mapped_column(String(64),primary_key=True)
+    user_id: Mapped[str]=mapped_column(ForeignKey('users.id',ondelete='CASCADE'),index=True)
+    selected: Mapped[str|None]=mapped_column(String(80),nullable=True)
+    updated: Mapped[int]=mapped_column(Integer,default=now,index=True)
 class Token(Base):
     __tablename__='action_tokens'
     digest: Mapped[str]=mapped_column(String(64),primary_key=True)
