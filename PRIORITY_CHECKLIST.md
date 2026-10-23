@@ -1,8 +1,10 @@
 # Engineering Studio — current delivery checklist
 
-Reviewed 24 October 2026. Current usability evidence: [v13 review](V13_USABILITY_REVIEW.md); broader engineering evidence: [v12 audit](V12_AUDIT.md). Historical milestone reports remain in the repository. Completed means the bounded implementation below; it does not mean professional CAD or manufacturing certification.
+Reviewed 24 October 2026. Current UI evidence: [v14 workbench review](V14_WORKBENCH_REVIEW.md); previous usability evidence: [v13 review](V13_USABILITY_REVIEW.md); broader engineering evidence: [v12 audit](V12_AUDIT.md). Historical milestone reports remain in the repository. Completed means the bounded implementation below; it does not mean professional CAD or manufacturing certification.
 
 ## Delivered and locally verified
+
+- [x] v14 UI: named tool groups, light/dark panels, card/list catalogue views, independently scrolling parts, searchable keyboard tool finder, floating camera controls, workspace help and responsive expanded editing. Full browser regression: 71 passed, 1 desktop-only library drag case skipped on phone; all JavaScript suites passed.
 
 - [x] v13 usability: direct mesh selection in Orbit mode, actual part thumbnails, category/search filters, sizing/material previews before insertion, guided face attachment, drag-and-snap, fixed connections/Detach, expanded workspace and selection focus/isolation. Full browser regression: 63 passed, 1 desktop-only drag case skipped on phone.
 

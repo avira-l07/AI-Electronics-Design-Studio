@@ -1,6 +1,6 @@
 # Engineering Studio — status and remaining work
 
-Reviewed 24 October 2026. Latest [v13 usability review](V13_USABILITY_REVIEW.md): guided and drag-based attachment, pre-insertion previews and a canvas-focused layout are delivered. The site is an engineering concept workspace with working local tools and a tested account-server implementation. The static publication does not deploy FastAPI/PostgreSQL. Cloud deployment remains held at the owner's request.
+Reviewed 24 October 2026. Latest [v14 workbench review](V14_WORKBENCH_REVIEW.md): visual hierarchy, parts browsing, tool discovery, property editing and responsive viewing have been improved. Prior [v13 usability review](V13_USABILITY_REVIEW.md): guided and drag-based attachment, pre-insertion previews and a canvas-focused layout are delivered. The site is an engineering concept workspace with working local tools and a tested account-server implementation. The static publication does not deploy FastAPI/PostgreSQL. Cloud deployment remains held at the owner's request.
 
 | Screenshot workstream | Current state | Remaining boundary |
 | --- | --- | --- |
@@ -11,6 +11,6 @@ Reviewed 24 October 2026. Latest [v13 usability review](V13_USABILITY_REVIEW.md)
 | Export/hardware acceptance | 14 actual application STL/OBJ files pass independent parsing. Reference coupon and acceptance kit included. | CAD/slicer execution, toolpaths and physical measurements are unverified. |
 | Simulation | Additional beam/fatigue/thermal/RC/point-mass flight models pass numeric benchmarks. | Full FEA/CFD/SPICE, fatigue-life prediction and six-DOF flight validation remain open. |
 
-Verification: 52 full desktop/phone browser cases, 108 API cases and all JavaScript suites passed. The expanded browser test exposed and now covers an actual concurrent-request event-loop/SQLite lock failure that serial API tests missed.
+Latest UI verification: 71 desktop/phone browser cases passed, 1 native desktop library drag case was skipped on phone, and all JavaScript suites passed. Earlier engineering/server verification covered 52 browser cases and 108 API cases; the API suite was not rerun for this UI-only change. The expanded browser test exposed and now covers an actual concurrent-request event-loop/SQLite lock failure that serial API tests missed.
 
 Use [PRIORITY_CHECKLIST.md](PRIORITY_CHECKLIST.md) for order and [V12_AUDIT.md](V12_AUDIT.md) for exact implementations, tests, limits and formula references. [FREE_AND_PRO.md](FREE_AND_PRO.md) defines entitlements: all new local engineering tools remain Free; Pro owners manage teams and invited Free accounts participate by role. Prices/live payments and AI provider activation remain pending configuration and acceptance.

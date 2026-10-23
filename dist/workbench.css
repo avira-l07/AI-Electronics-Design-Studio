@@ -1,0 +1,271 @@
+/* v14 — a quiet technical workbench. All layout is native, no remote fonts/assets. */
+.editor3d {
+  --wb-panel: #f6f8f5;
+  --wb-card: #ffffff;
+  --wb-field: #ffffff;
+  --wb-ink: #20372e;
+  --wb-muted: #596e63;
+  --wb-line: #d6e0d9;
+  --wb-soft: #eaf0e9;
+  --wb-accent: #2e644c;
+  --wb-selected: #e1edda;
+  grid-template-areas: "heading heading heading" "toolbar toolbar toolbar" "coach coach coach" "parts viewport inspector" "status status status";
+  grid-template-columns: 272px minmax(0,1fr) 300px;
+  grid-template-rows: auto auto auto minmax(0,1fr) auto;
+  height: 880px;
+  border: 1px solid #91a59a;
+  border-radius: 14px;
+  background: #1c282f;
+  box-shadow: 0 18px 45px #162e2317;
+  font-size: 12px;
+}
+[data-theme=dark] .editor3d {
+  --wb-panel:#202e2a; --wb-card:#263832; --wb-field:#172a23;
+  --wb-ink:#e5eee8; --wb-muted:#b3c8bb; --wb-line:#455b4e;
+  --wb-soft:#30463a; --wb-accent:#bfdf9e; --wb-selected:#3b5037;
+}
+.editor3d *, .editor3d *::before, .editor3d *::after { box-sizing:border-box; }
+.editor3d button { cursor:pointer; font-family:inherit; }
+.editor3d button:focus-visible { outline:2px solid #6aaa83; outline-offset:2px; }
+.editor3d button:disabled { cursor:not-allowed; opacity:.45; }
+.workbenchHeader { grid-area:heading; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 18px; background:#152b24; border-bottom:1px solid #40594c; color:#f0f5e9; }
+.workbenchIdentity, .workbenchHeaderActions { display:flex; align-items:center; gap:12px; min-width:0; }
+.workbenchMark { display:grid; place-items:center; width:38px; height:38px; flex-shrink:0; background:#bddd97; border-radius:10px; color:#17382a; }
+.workbenchMark svg { width:25px; height:25px; }
+.workbenchEyebrow { display:block; font-size:9px; font-weight:600; letter-spacing:1.6px; line-height:1.7; }
+.workbenchIdentity .workbenchEyebrow { color:#afc5b3; }
+.workbenchIdentity>div { min-width:0; }
+.workbenchIdentity strong { display:block; max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15px; font-weight:600; line-height:1.5; }
+.workbenchStorage { border:1px solid #466252; border-radius:20px; padding:5px 9px; color:#c2d7c7; font-size:10px; white-space:nowrap; }
+.workbenchHeaderActions button { display:flex; align-items:center; justify-content:center; gap:8px; min-height:36px; border:1px solid #526b5b; border-radius:7px; background:#233d30; color:#f1f6ed; padding:7px 10px; font-size:12px; white-space:nowrap; }
+.workbenchHeaderActions #workbenchHelp { width:36px; border-radius:50%; font-size:15px; }
+.workbenchHeaderActions #findWorkbenchTool { background:#304a3a; min-width:185px; justify-content:flex-start; }
+.workbenchHeaderActions kbd { margin-left:auto; background:#1c3227; color:#d2e0d4; padding:3px 5px; border:1px solid #4b6654; border-radius:4px; font-size:9px; }
+.editor3d .editor3d-toolbar { padding:10px 14px; gap:10px 14px; background:#edf2ec; border-bottom:1px solid #cfdbd2; flex-wrap:wrap; align-items:stretch; overflow:visible; max-height:none; }
+[data-theme=dark] .editor3d .editor3d-toolbar { background:#253b2e; border-color:var(--wb-line); }
+.workbenchToolGroup { display:flex; flex-direction:column; gap:5px; flex:0 0 auto; padding-right:13px; border-right:1px solid var(--wb-line); }
+.workbenchToolGroup:last-child { border:0; padding:0; }
+.workbenchToolGroup>div { display:flex; align-items:center; gap:4px; }
+.editor3d .tb-label { display:block; color:var(--wb-muted); font-size:8px; letter-spacing:1.4px; margin:0 0 0 2px; }
+.editor3d .editor3d-toolbar button { min-height:32px; padding:6px 9px; color:var(--wb-ink); background:transparent; border:1px solid transparent; border-radius:6px; font-size:11px; font-weight:500; white-space:nowrap; }
+.editor3d .editor3d-toolbar button:hover { background:var(--wb-card); border-color:var(--wb-line); }
+.editor3d .editor3d-toolbar button.active { color:var(--wb-ink); background:var(--wb-selected); border-color:#92ad83; box-shadow:inset 0 -2px #6a8b54; }
+.editor3d .editor3d-toolbar #tb-model { background:#2e644c; color:#fff; border-color:#2e644c; }
+.editor3d .editor3d-toolbar #tb-del, .editor3d .editor3d-toolbar #tb-clear { color:#96504b; }
+[data-theme=dark] .editor3d .editor3d-toolbar #tb-del,[data-theme=dark] .editor3d .editor3d-toolbar #tb-clear { color:#f3b7a9; }
+.editor3d .tbSnap { color:var(--wb-muted); padding:0 5px; font-size:10px; }
+.editor3d .tbSnap input { accent-color:#32664f; }
+.assemblyCoach { padding:10px 15px; background:#213c30; border-color:#4d6554; }
+.assemblyCoachActions { gap:6px; align-items:center; }
+.assemblyCoach button { border:1px solid #607c67; border-radius:6px; background:#2b4938; color:#e2eee4; padding:7px 11px; min-height:34px; font-size:11px; }
+.assemblyCoach #attachFaces { background:#c8e7a8; border-color:#c8e7a8; color:#1f3928; }
+.assemblyCoach #dragSnap { background:#395a42; border-color:#9cbe87; color:#e3f5d0; }
+.assemblyCoach #leaveWorkspaceFocus { margin-left:auto; }
+.assemblyCoach p { color:#bcd0c1; font-size:11px; line-height:1.5; margin-top:6px; }
+.editor3d .editor3d-parts, .editor3d .editor3d-inspector { background:var(--wb-panel); color:var(--wb-ink); border-color:var(--wb-line); scrollbar-color:#a1b3a7 transparent; scrollbar-width:thin; }
+.editor3d .editor3d-parts { overflow:hidden; flex-direction:column; }
+.editor3d .editor3d-parts>label,.editor3d .editor3d-parts>input,.editor3d .editor3d-parts>select,.editor3d .editor3d-parts>p { flex-shrink:0; }
+.editor3d .editor3d-parts-head { position:static; flex-shrink:0; padding:17px 14px 13px; border-color:var(--wb-line); background:var(--wb-panel); letter-spacing:0; color:var(--wb-muted); }
+.editor3d-parts-head strong { display:block; color:var(--wb-ink); font-size:18px; line-height:1.5; font-weight:600; }
+.libraryLayoutControls { display:flex; gap:3px; }
+.libraryLayoutControls button { min-width:29px; min-height:29px; padding:3px; font-size:17px; color:var(--wb-muted); border:1px solid var(--wb-line); border-radius:5px; background:var(--wb-card); }
+.libraryLayoutControls [aria-pressed=true] { color:var(--wb-ink); background:var(--wb-selected); border-color:#8ea77d; }
+.editor3d .partsCategoryLabel { color:var(--wb-muted); padding:11px 14px 6px; font-size:11px; }
+.editor3d #partsCategory, .editor3d .parts-search { background:var(--wb-field)!important; border:1px solid var(--wb-line); border-radius:7px; color:var(--wb-ink)!important; min-height:36px; font-size:12px; padding:8px 10px; }
+.editor3d .parts-search { margin-top:7px; margin-bottom:7px; }
+.editor3d .parts-search::placeholder { color:var(--wb-muted); }
+.editor3d #partsFilterCount, .editor3d #noPartsFound { color:var(--wb-muted); font-size:10px; padding:0 14px; }
+.editor3d #partsList { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-auto-rows:min-content; align-content:start; flex:1 1 auto; min-height:0; overflow-y:auto; scrollbar-width:thin; gap:8px; padding:0 12px 16px; }
+.editor3d .catalogueCategory { display:contents; }
+.editor3d .parts-category { grid-column:1/-1; color:var(--wb-muted); margin-top:10px; padding:5px 0; font-size:9px; letter-spacing:1px; }
+.editor3d .catalogueCard { min-width:0; min-height:190px; padding:0 0 8px; border:1px solid var(--wb-line); border-radius:9px; overflow:hidden; background:var(--wb-card); transition:border-color .15s,box-shadow .15s; }
+.editor3d .catalogueCard:hover, .editor3d .catalogueCard:focus-within { border-color:#83a47c; box-shadow:0 3px 12px #173c2112; }
+.editor3d .part-item { display:flex; flex-direction:column; align-items:stretch; gap:6px; padding:7px; min-height:146px; border:0; background:transparent; }
+.editor3d .part-item:hover,.editor3d .part-item:focus-visible { background:var(--wb-soft); }
+.editor3d .part-icon { display:flex; align-items:center; justify-content:center; width:100%; height:72px; border:0; border-radius:6px; background:linear-gradient(150deg,#edf2ec,#dce5df); }
+.editor3d .part-icon img { width:96px; max-width:100%; height:72px; filter:drop-shadow(0 4px 3px #29403524); }
+.editor3d .part-item-info strong { color:var(--wb-ink); font-size:11px; font-weight:600; line-height:1.45; white-space:normal; }
+.editor3d .part-item-info small { color:var(--wb-muted); font-size:9px; line-height:1.5; }
+.editor3d .partPreviewButton { display:block; width:calc(100% - 14px); margin:3px 7px 0; padding:5px 3px; min-height:29px; color:var(--wb-accent); background:var(--wb-soft); border:1px solid var(--wb-line); border-radius:5px; font-size:10px; font-weight:600; }
+.editor3d .catalogueCard:has([data-insert=custom_solid]) { grid-column:1/-1; min-height:100px; }
+.editor3d [data-insert=custom_solid] { min-height:58px; flex-direction:row; align-items:center; }
+.editor3d [data-insert=custom_solid] .part-icon { width:44px; height:44px; flex-shrink:0; }
+.editor3d .catalogueCard:has([data-insert=custom_solid]) .partPreviewButton { width:calc(100% - 65px); margin-left:58px; }
+.editor3d[data-library-layout=list] #partsList { grid-template-columns:1fr; }
+.editor3d[data-library-layout=list] .part-item { flex-direction:row; align-items:center; min-height:75px; }
+.editor3d[data-library-layout=list] .catalogueCard { min-height:115px; }
+.editor3d[data-library-layout=list] .part-icon { width:70px; height:55px; flex-shrink:0; }
+.editor3d[data-library-layout=list] .part-icon img { width:70px; height:55px; }
+.editor3d[data-library-layout=list] .partPreviewButton { width:auto; margin-left:83px; margin-right:8px; }
+.editor3d .editor3d-viewport { background:#1c282f; }
+.viewportCameraDock { position:absolute; top:16px; left:50%; transform:translateX(-50%); display:flex; gap:3px; padding:4px; background:#101f28dd; border:1px solid #607b8480; border-radius:9px; box-shadow:0 4px 20px #08131a40; }
+.viewportCameraDock button { padding:6px 9px; min-height:28px; font-size:10px; color:#e1ecee; background:transparent; border:1px solid transparent; border-radius:5px; }
+.viewportCameraDock button:hover,.viewportCameraDock button:focus-visible { background:#365149; }
+.editor3d .v3d-badge { color:#d2e3e3; background:#152730d9; border-color:#66828b66; border-radius:6px; font-size:9px; letter-spacing:.5px; }
+.editor3d .v3d-badge strong { color:#d9edcc; }
+.viewportLiveDot { display:inline-block; width:5px; height:5px; border-radius:50%; background:#caeaa5; margin:0 4px 1px 0; }
+.editor3d .v3d-btn { color:#d8e6df; background:#142932d9; border-color:#68848c66; border-radius:7px; }
+.editor3d .v3d-empty-icon { color:#c9e5b1; border:1px solid #95b68b; border-radius:18px; width:70px; height:70px; background:#284b3f99; box-shadow:0 10px 30px #091e2a33; }
+.editor3d .v3d-empty p { font-size:20px; font-weight:500; max-width:330px; line-height:1.4; color:#eff5ed; }
+.editor3d .v3d-empty small { color:#becfcf; font-size:12px; line-height:1.9; }
+.editor3d .inspectorJump { position:sticky; top:0; gap:3px; padding:11px; background:var(--wb-panel); border-color:var(--wb-line); }
+.editor3d .inspectorJump button { color:var(--wb-ink); background:var(--wb-card); border:1px solid var(--wb-line); border-radius:6px; padding:9px; font-size:12px; min-height:36px; }
+.editor3d .inspectorJump [aria-pressed=true] { background:var(--wb-selected); border-color:#9bb68c; }
+.editor3d .inspector-head { padding:12px 15px; color:var(--wb-muted); background:var(--wb-soft); border-color:var(--wb-line); font-size:9px; letter-spacing:1.3px; }
+.editor3d .selectedPartTitle { padding:17px 15px 2px; color:var(--wb-ink); }
+.selectedPartTitle .workbenchEyebrow { color:var(--wb-muted); font-size:8px; }
+.selectedPartTitle strong { display:block; font-size:19px; line-height:1.6; overflow-wrap:anywhere; }
+.selectedPartTitle small { display:block; color:var(--wb-muted); font-size:10px; line-height:1.7; font-weight:400; }
+.editor3d .inspector-section { padding:15px; border-color:var(--wb-line); }
+.editor3d .inspector-section h4 { color:var(--wb-muted); font-size:10px; letter-spacing:.8px; margin-bottom:10px; }
+.editor3d .selectionShortcuts { margin:4px 0 17px; gap:5px; }
+.editor3d .selectionShortcuts button { background:var(--wb-card); border:1px solid var(--wb-line); color:var(--wb-accent); border-radius:5px; font-size:11px; min-height:32px; padding:6px; }
+.editor3d .dim-grid { gap:11px 9px; }
+.editor3d .dim-field label { color:var(--wb-muted); font-size:11px; }
+.editor3d .dim-field input { min-height:36px; padding:8px 10px; color:var(--wb-ink)!important; background:var(--wb-field)!important; border:1px solid var(--wb-line); border-radius:6px; font-size:13px; letter-spacing:0; }
+.editor3d .dim-field input:focus { outline:2px solid #8caf7d; outline-offset:1px; }
+.editor3d .dim-apply { border:1px solid var(--wb-line); background:var(--wb-soft); color:var(--wb-accent); border-radius:6px; min-height:34px; font-size:11px; margin-top:11px; }
+.editor3d #applyDims { background:#32664f; color:#fff; border-color:#32664f; }
+.editor3d .mat-btn { display:flex; align-items:center; gap:6px; color:var(--wb-ink); background:var(--wb-card); border:1px solid var(--wb-line); border-radius:6px; text-align:left; font-size:10px; padding:8px; }
+.mat-btn i { width:10px; height:10px; border-radius:50%; border:1px solid #718676; flex-shrink:0; }
+.editor3d .mat-btn.active { background:var(--wb-selected); border-color:#7f9f71; }
+.editor3d .transform-grid button { background:var(--wb-card); border-color:var(--wb-line); color:var(--wb-ink); border-radius:6px; }
+.editor3d .attachedPartNote { padding:9px; background:var(--wb-soft); color:var(--wb-ink); border-left:3px solid #a38b40; border-radius:3px; font-size:10px; }
+.editor3d .inspector-none { color:var(--wb-muted); padding:24px 18px; font-size:12px; line-height:1.8; }
+.inspectorEmptyMark { display:grid; place-items:center; width:44px; height:44px; border-radius:12px; background:var(--wb-soft); color:var(--wb-accent); font-size:27px; margin-bottom:13px; }
+.inspector-none strong { color:var(--wb-ink); display:block; font-size:15px; font-weight:600; }
+.inspector-none p { margin:9px 0 15px; }
+.inspector-none ol { padding-left:18px; }
+.editor3d .assemblySearchLabel { color:var(--wb-muted); font-size:11px; padding:12px; }
+.editor3d .assemblySearchLabel input { background:var(--wb-field); color:var(--wb-ink); border:1px solid var(--wb-line); border-radius:6px; font-size:12px; }
+.editor3d .asm-name, .editor3d .asm-item { color:var(--wb-ink); font-size:12px; }
+.editor3d .asm-item { border-color:var(--wb-line); }
+.editor3d .asm-item.selected,.editor3d .asm-item:hover { background:var(--wb-selected); }
+.editor3d .asm-vis { color:var(--wb-accent); border-color:var(--wb-line); background:var(--wb-card); }
+.editor3d .asm-group summary { color:var(--wb-ink); background:var(--wb-soft); border-color:var(--wb-line); }
+.editor3d .asm-group summary span { color:var(--wb-muted); }
+.editor3d .assemblyTools { border-color:var(--wb-line); color:var(--wb-ink); padding:14px; }
+.editor3d .assemblyTools .toolHint { color:var(--wb-muted); font-size:11px; }
+.editor3d .assemblyTools button { color:var(--wb-accent); background:var(--wb-card); border:1px solid var(--wb-line); border-radius:6px; }
+.editor3d .assemblyTools input,.editor3d .assemblyTools select { color:var(--wb-ink); background:var(--wb-field); border:1px solid var(--wb-line); }
+.editor3d .assemblyTools output { color:var(--wb-accent); }
+.editor3d .jointRow { border-color:var(--wb-line); }
+.editor3d .asm-bom { border-color:var(--wb-line); background:var(--wb-soft); }
+.editor3d .asm-bom h4,.editor3d .bom-row { color:var(--wb-muted); }
+.editor3d .export-btns { padding:12px; border-color:var(--wb-line); background:var(--wb-panel); }
+.editor3d .export-btns button { color:var(--wb-accent); border-color:var(--wb-line); background:var(--wb-card); }
+.workbenchStatus { grid-area:status; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 13px; background:#152b24; border-top:1px solid #415b4b; color:#c4d4c7; font-size:9px; }
+.workbenchStatus i { display:inline-block; width:5px; height:5px; border-radius:50%; background:#c7e3a6; margin-right:5px; }
+.workbenchStatus .tb-coords { font:10px ui-monospace,Consolas,monospace; color:#d3e0d6; }
+.workbenchStatus button { color:#ccddce; background:transparent; border:0; padding:2px; font-size:10px; }
+.studioFocus .editor3d { inset:8px; width:calc(100vw - 16px); height:calc(100dvh - 16px); box-shadow:0 0 0 12px #142a22; }
+.studioFocus .editor3d-toolbar { max-height:none; }
+.v3dCreateBar { gap:8px; padding:14px; border:1px solid var(--studio-border); background:var(--solid-surface,#fff); border-radius:10px; }
+.v3dCreateBar button { min-height:36px; font-size:11px; padding:8px 12px; border-radius:6px; }
+.v3dCreateBar a { font-size:11px; }
+.v3dDisclaimer { max-width:1000px; font-size:10px; }
+.workbenchCompanion { margin-top:22px; }
+.workbenchCompanion h3 { color:var(--studio-ink); font-size:17px; margin:0 0 7px; }
+.workbenchCompanion>p { color:var(--studio-muted); font-size:12px; margin:0 0 14px; line-height:1.7; }
+#dialog:has(.workbenchFinder) { width:620px; max-width:calc(100vw - 24px); padding:23px; }
+.workbenchFinder>label { display:block; margin:10px 0 8px; font-size:12px; color:var(--studio-muted); }
+.workbenchFinder>input { width:100%; border:1px solid var(--studio-border); border-radius:8px; background:var(--solid-field,#f5f8f3); color:var(--studio-ink); padding:13px; font-size:14px; }
+.finderHint, #workbenchToolCount { font-size:10px; color:var(--studio-muted); margin:10px 0; }
+#workbenchToolResults { max-height:50dvh; min-height:100px; overflow-y:auto; overscroll-behavior:contain; }
+#workbenchToolResults button { width:100%; display:grid; grid-template-columns:67px minmax(0,1fr) 15px; gap:12px; align-items:center; text-align:left; padding:13px 8px; border:0; border-bottom:1px solid var(--studio-border); border-radius:0; color:var(--studio-ink); background:transparent; }
+#workbenchToolResults button:hover,#workbenchToolResults button:focus-visible { background:var(--studio-soft); outline:2px solid var(--studio-accent); outline-offset:-2px; }
+.finderGroup { align-self:start; padding-top:2px; color:var(--studio-muted); font-size:9px; text-transform:uppercase; letter-spacing:.6px; }
+#workbenchToolResults strong { display:block; font-size:12px; margin-bottom:4px; font-weight:600; }
+#workbenchToolResults small { color:var(--studio-muted); font-size:10px; line-height:1.6; }
+.finderEmpty { padding:30px 10px; color:var(--studio-muted); font-size:12px; }
+#dialog:has(.workbenchHelp) { width:760px; }
+.workbenchHelp { color:var(--studio-ink); font-size:12px; line-height:1.8; }
+.helpSteps { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:20px 0; }
+.helpSteps article { padding:16px; background:var(--studio-soft); border-radius:8px; }
+.helpSteps article>span { display:block; color:var(--studio-accent); font-size:22px; margin-bottom:10px; }
+.helpSteps strong { display:block; font-size:12px; }
+.helpSteps p { margin:8px 0 0; font-size:11px; }
+.workbenchHelp dl { display:grid; grid-template-columns:1fr 1fr; gap:9px 20px; border-top:1px solid var(--studio-border); padding-top:17px; }
+.workbenchHelp dt { color:var(--studio-muted); }
+.workbenchHelp dd { margin:0; }
+.workbenchHelp kbd { padding:3px 6px; border:1px solid var(--studio-border); border-radius:4px; background:var(--studio-soft); }
+@media(min-width:901px) and (max-width:1200px) {
+  .editor3d { grid-template-columns:232px minmax(0,1fr) 268px; }
+  .workbenchStorage { display:none; }
+  .editor3d .editor3d-toolbar { gap:8px; }
+  .workbenchToolGroup { padding-right:8px; }
+  .viewportCameraDock { top:54px; }
+}
+@media(max-width:900px) {
+  .editor3d { grid-template-areas:"heading" "toolbar" "coach" "viewport" "panels" "parts" "inspector" "status"; grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto auto 380px auto 390px auto auto; height:auto; }
+  .workbenchHeader { padding:10px; gap:8px; }
+  .workbenchMark { width:32px; height:32px; border-radius:8px; }
+  .workbenchMark svg { width:22px; height:22px; }
+  .workbenchIdentity { gap:8px; flex:1; }
+  .workbenchIdentity strong { font-size:12px; max-width:220px; }
+  .workbenchIdentity .workbenchEyebrow { font-size:8px; letter-spacing:1px; }
+  .workbenchStorage, .workbenchHeaderActions kbd { display:none; }
+  .workbenchHeaderActions { gap:5px; }
+  .workbenchHeaderActions #findWorkbenchTool { min-width:0; font-size:11px; }
+  .workbenchHeaderActions #focusWorkbench { font-size:17px; min-width:34px; padding:5px; }
+  .workbenchHeaderActions #focusWorkbench span { display:none; }
+  .editor3d .editor3d-toolbar { flex-wrap:nowrap; padding:8px; overflow-x:auto; max-width:100%; gap:10px; scrollbar-width:thin; }
+  .editor3d .editor3d-toolbar button { min-height:38px; padding:7px 9px; }
+  .editor3d .tb-label { display:block; font-size:8px; }
+  .assemblyCoach button { min-height:38px; padding:7px 9px; }
+  .assemblyCoach #leaveWorkspaceFocus { margin-left:0; }
+  .assemblyCoach p { font-size:10px; }
+  .editor3d .editor3d-parts { display:flex; max-height:none; }
+  .editor3d #partsList { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .editor3d .part-item { min-height:140px; }
+  .editor3d .editor3d-inspector { overflow:visible; }
+  .editor3d .partPreviewButton { margin:3px 7px 0; }
+  .mobileWorkspacePanels { background:var(--wb-soft); padding:8px; border-bottom:1px solid var(--wb-line); }
+  .mobileWorkspacePanels button { color:var(--wb-ink); background:var(--wb-card); border:1px solid var(--wb-line); border-radius:6px; font-size:12px; }
+  .studioFocus .editor3d { inset:0; height:100dvh; width:100vw; border-radius:0; grid-template-areas:"heading" "toolbar" "coach" "viewport" "panels" "inspector" "status"; grid-template-rows:auto auto auto minmax(130px,1fr) auto minmax(145px,30dvh) auto; }
+  .studioFocus .editor3d[data-mobile-panel=parts] { grid-template-areas:"heading" "toolbar" "coach" "viewport" "panels" "parts" "status"; }
+  .studioFocus .editor3d[data-mobile-panel=edit] { grid-template-rows:auto auto auto minmax(130px,1fr) auto minmax(155px,34dvh) auto; }
+  .studioFocus .editor3d .editor3d-toolbar { max-height:none; }
+  .studioFocus .editor3d .editor3d-parts { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:auto auto minmax(0,1fr); }
+  .studioFocus .editor3d-parts-head, .studioFocus .partsCategoryLabel { display:none; }
+  .studioFocus .editor3d .parts-search, .studioFocus .editor3d #partsCategory { font-size:12px!important; min-height:32px; }
+  .studioFocus .editor3d #partsList { grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; padding:0 8px 10px; }
+  .studioFocus .editor3d .catalogueCard { min-height:108px; }
+  .studioFocus .editor3d .part-item { flex-direction:row; align-items:center; padding:6px; min-height:62px; }
+  .studioFocus .editor3d .part-icon, .studioFocus .editor3d .part-icon img { width:54px; height:45px; }
+  .studioFocus .editor3d .partPreviewButton { width:calc(100% - 14px); margin:2px 7px 0; min-height:27px; }
+  .studioFocus .editor3d .editor3d-inspector { overflow-y:auto; }
+  .studioFocus .selectedPartTitle .workbenchEyebrow { display:none; }
+  .studioFocus .selectedPartTitle strong { font-size:16px; }
+  .studioFocus .selectedPartTitle small { font-size:9px; }
+  .studioFocus .selectionShortcuts button { min-height:28px; }
+  .workbenchStatus { padding:6px 9px; font-size:8px; }
+  .workbenchStatus .tb-coords { font-size:9px; }
+  .workbenchStatus button { display:none; }
+  .editor3d .dim-field input { font-size:16px!important; }
+  .viewportCameraDock { top:52px; }
+  .editor3d .v3d-empty p { font-size:18px; }
+}
+@media(max-width:540px) {
+  .workbenchIdentity strong { max-width:95px; font-size:11px; }
+  .workbenchMark { display:none; }
+  .workbenchIdentity .workbenchEyebrow { font-size:7px; letter-spacing:.8px; }
+  .workbenchHeaderActions #workbenchHelp { width:30px; min-height:32px; font-size:13px; }
+  .workbenchHeaderActions #findWorkbenchTool { font-size:10px; padding:7px; }
+  .editor3d #partsList { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .editor3d .part-item { min-height:142px; }
+  .studioFocus .assemblyCoachActions { gap:4px; }
+  .studioFocus .assemblyCoach button { min-height:30px; padding:5px 7px; font-size:10px; }
+  .studioFocus .assemblyCoach p { font-size:10px; line-height:1.4; margin-top:5px; }
+  .studioFocus #attachmentOptions { max-height:145px; overflow-y:auto; }
+  .studioFocus .workbenchStatus>span:first-child { max-width:110px; line-height:1.5; }
+  .editor3d .v3d-badge { font-size:8px; padding:5px 7px; }
+  .editor3d .v3d-empty { padding:20px; }
+  .editor3d .v3d-empty small { font-size:11px; }
+  .helpSteps { grid-template-columns:1fr; gap:8px; }
+  .helpSteps article { padding:12px; }
+  .helpSteps article>span { float:left; margin:0 12px 0 0; font-size:18px; }
+  .workbenchHelp dl { gap:10px; font-size:10px; }
+  #workbenchToolResults button { grid-template-columns:57px minmax(0,1fr) 10px; gap:8px; }
+}
+@media(prefers-reduced-motion:reduce) { .editor3d .catalogueCard { transition:none; } }

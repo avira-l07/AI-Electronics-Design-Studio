@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   Studio 3D Editor – guided assembly and customization (v13.0)
+   Studio 3D Editor – visual engineering workbench (v14.0)
    Parts library · Dimension inspector · Assembly tools · STL/OBJ export
    Procedural geometry — no external mesh files required.
    ═══════════════════════════════════════════════════════════════ */
@@ -336,33 +336,33 @@
     const tbBtn = (id, label, svgPath, active = '') =>
       `<button id="${id}" class="${active}" title="${label}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${svgPath}"/></svg> ${label}</button>`;
 
+    const companionTools = `<div class="v3dCreateBar"><button id="workspaceFocus">Expand workspace ↗</button><button class="primary" id="startCustomSolid">＋ Draw your own 3D part</button><button id="openMeshImport">Import STL / OBJ</button><button id="openPersonalParts">My reusable parts</button><button id="inspectManufacturing">Inspect & mass</button><button id="manufacturingTools">Fit & mesh tools</button><button id="faceWorkPlane">Model on a face</button><button id="engineeringLab">Calculation lab</button><button id="projectServices">AI & team</button><a href="#/templates">Browse assembly starters →</a></div><p class="v3dDisclaimer">Custom solids retain editable modelling recipes. Catalogue and imported parts are concept meshes. Reference exports: visible parts, mm, Z-up. Use Inspect & mass for topology checks and density-based estimates; external manufacturing review is still required.</p>`;
     return `
-<div class="v3dCreateBar"><button id="workspaceFocus">Expand workspace ↗</button><button class="primary" id="startCustomSolid">＋ Draw your own 3D part</button><button id="openMeshImport">Import STL / OBJ</button><button id="openPersonalParts">My reusable parts</button><button id="inspectManufacturing">Inspect & mass</button><button id="manufacturingTools">Fit & mesh tools</button><button id="faceWorkPlane">Model on a face</button><button id="engineeringLab">Calculation lab</button><button id="projectServices">AI & team</button><a href="#/templates">Browse assembly starters →</a></div><p class="v3dDisclaimer">Custom solids retain editable modelling recipes. Catalogue and imported parts are concept meshes. Reference exports: visible parts, mm, Z-up. Use Inspect & mass for topology checks and density-based estimates; external manufacturing review is still required.</p>${assemblyGuide()}<div class="editor3d" id="editor3d" data-mobile-panel="parts">
+${assemblyGuide()}<div class="editor3d" id="editor3d" data-mobile-panel="parts">
 
-  <!-- Toolbar -->
+  <div class="workbenchHeader"><div class="workbenchIdentity"><span class="workbenchMark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m12 2 9 5v10l-9 5-9-5V7l9-5Zm0 10L3 7m9 5 9-5m-9 5v10"/></svg></span><div><span class="workbenchEyebrow">3D DESIGN STUDIO</span><strong>${esc(current.name)}</strong></div><span class="workbenchStorage">${studioBackend.enabled?'Connected account':'Local device'}</span></div><div class="workbenchHeaderActions"><button id="findWorkbenchTool" title="Find a 3D tool (Ctrl or Command + /)"><span aria-hidden="true">⌕</span> Find a tool <kbd>Ctrl /</kbd></button><button id="workbenchHelp" aria-label="Workspace controls and help">?</button><button id="focusWorkbench" title="Expand or restore workspace">⤢ <span>Expand</span></button></div></div>
+  <!-- Tools stay visible in named groups; the finder also reaches advanced tools. -->
   <div class="editor3d-toolbar">
-    <span class="tb-label">VIEW</span><button id="tb-undo" title="Undo 3D edit">↶ Undo</button><button id="tb-redo" title="Redo 3D edit">↷ Redo</button>
+    <div class="workbenchToolGroup" role="group" aria-label="History"><span class="tb-label">HISTORY</span><div><button id="tb-undo" title="Undo 3D edit">↶ Undo</button><button id="tb-redo" title="Redo 3D edit">↷ Redo</button></div></div>
+    <div class="workbenchToolGroup" role="group" aria-label="Camera"><span class="tb-label">NAVIGATE</span><div>
     ${tbBtn('tb-orbit','Orbit','M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3','active')}
     ${tbBtn('tb-top','Top','M3 3h18v18H3zM3 9h18M9 3v18')}
     ${tbBtn('tb-front','Front','M3 3h18v18H3zM3 12h18M12 3v18')}
     ${tbBtn('tb-iso','Iso','M2 16 12 4l10 12M2 16l10 4 10-4M12 4v16')}<button id="tb-fit" title="Frame all visible parts">Fit assembly</button>
-    <div class="tb-sep"></div>
-    <span class="tb-label">TOOLS</span><button id="tb-model">＋ Create solid</button><button id="tb-edit-model">Edit solid</button><button id="tb-move">Move</button><button id="tb-rotate">Rotate</button><label class="tbSnap"><input id="tb-snap" type="checkbox" ${snapTransforms?'checked':''}> Snap 1 mm / 15°</label>
+    </div></div><div class="workbenchToolGroup" role="group" aria-label="Transform"><span class="tb-label">TRANSFORM</span><div><button id="tb-move">Move</button><button id="tb-rotate">Rotate</button><label class="tbSnap"><input id="tb-snap" type="checkbox" ${snapTransforms?'checked':''}> Snap 1 mm / 15°</label>
     ${tbBtn('tb-select','Select','m4 4 7 18 3-7 7-3z')}
-    ${tbBtn('tb-explode','Explode','M5 9 2 12l3 3M19 9l3 3-3 3M9 5l3-3 3 3M9 19l3 3 3-3')}
+    </div></div><div class="workbenchToolGroup" role="group" aria-label="Model and inspect"><span class="tb-label">MODEL & VIEW</span><div><button id="tb-model">＋ Create solid</button><button id="tb-edit-model">Edit solid</button>${tbBtn('tb-explode','Explode','M5 9 2 12l3 3M19 9l3 3-3 3M9 5l3-3 3 3M9 19l3 3 3-3')}
     ${tbBtn('tb-wireframe','Wireframe','M2 16 12 4l10 12M2 16l10 4 10-4M12 4v16')}
     ${tbBtn('tb-extrude2d','Extrude 2D','M12 2v20M2 12h20M4 4l16 16')}
-    <div class="tb-sep"></div>
-    <span class="tb-label">PARTS</span>
+    </div></div><div class="workbenchToolGroup" role="group" aria-label="Part actions"><span class="tb-label">PARTS</span><div>
     ${tbBtn('tb-dup','Duplicate','M9 9h13v13H9zM5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1')}
     ${tbBtn('tb-del','Delete','M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6')}
     ${tbBtn('tb-clear','Clear','M3 3l18 18M9 9v6M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6')}
-    <div class="tb-sep"></div>
-    <span class="tb-label">EXPORT</span>
+    </div></div><div class="workbenchToolGroup" role="group" aria-label="Export"><span class="tb-label">EXPORT</span><div>
     ${tbBtn('tb-stl','STL','M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3')}
     ${tbBtn('tb-obj','OBJ','M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3')}
     ${tbBtn('tb-syncbom','Sync BOM','M4 6h16M4 12h16M4 18h7m7-3 3 3 4-4')}
-    <div class="tb-coords" id="v3dCoords">X — · Y — · Z — mm</div>
+    </div></div>
   </div>
 
   <div class="assemblyCoach" id="assemblyCoach"><div class="assemblyCoachActions"><button id="attachFaces">Attach faces</button><button id="dragSnap">Drag & snap</button><button id="focusSelected">Focus selected</button><button id="isolateSelected">Isolate selected</button><button id="showAllParts">Show all</button><button id="leaveWorkspaceFocus" hidden>Exit expanded view</button></div><p id="assemblyHint" role="status">Click a part to edit it. Drag empty space to orbit. Use Attach faces or Drag & snap to connect parts.</p><div id="attachmentOptions" hidden><label><input id="attachmentCentres" type="checkbox" checked> Use face centres</label><label>Gap mm<input id="attachmentGap" type="number" value="0" min="-1000" max="1000" step="0.1"></label><label>Turn °<input id="attachmentSpin" type="number" value="0" min="-3600" max="3600" step="15"></label><label><input id="attachmentAlign" type="checkbox" checked> Align faces</label><label><input id="attachmentLock" type="checkbox" checked> Keep attached</label><button id="applyAttachment" disabled>Attach now</button><button id="retryAttachment">Pick again</button><button id="cancelAttachment">Cancel</button></div></div>
@@ -370,8 +370,8 @@
   <!-- Parts library -->
   <div class="editor3d-parts">
     <div class="editor3d-parts-head">
-      <span>CONCEPT PARTS LIBRARY</span>
-      <span style="color:#5a8a68">${ALL_PARTS.length} parts</span>
+      <div><span class="workbenchEyebrow">BUILDING BLOCKS</span><strong>Parts library</strong></div>
+      <div class="libraryLayoutControls" role="group" aria-label="Library layout"><button id="libraryGrid" title="Card view" aria-label="Card view" aria-pressed="true">▦</button><button id="libraryList" title="List view" aria-label="List view" aria-pressed="false">☷</button></div>
     </div>
     <label class="partsCategoryLabel" for="partsCategory">Category</label><select id="partsCategory"><option value="all">All parts</option>${CATALOGUE.map(c=>`<option>${c.cat}</option>`).join('')}</select><input aria-label="Search 3D parts" class="parts-search" id="partsSearch" placeholder="Filter library…" autocomplete="off">
     <p id="partsFilterCount" role="status">${ALL_PARTS.length} parts · click to add, or preview first</p><div id="partsList">${partsPanel}</div><p id="noPartsFound" hidden>No matching parts. Try another category or search.</p>
@@ -383,9 +383,10 @@
     <canvas aria-label="3D assembly viewport" id="v3dCanvas" style="width:100%;height:100%;display:block;outline:none"></canvas>
 
     <div class="viewport3d-overlay v3d-top-left">
-      <div class="v3d-badge">3D WORKSPACE <strong>WebGL</strong></div>
+      <div class="v3d-badge"><span class="viewportLiveDot"></span> PERSPECTIVE <strong>mm</strong></div>
       <div class="v3d-badge" id="v3dSel" style="display:none">◈ <strong id="v3dSelName"></strong></div>
     </div>
+    <div class="viewportCameraDock" role="group" aria-label="Quick camera views"><button data-camera="iso" title="Isometric view (3)">Iso</button><button data-camera="top" title="Top view (1)">Top</button><button data-camera="front" title="Front view (2)">Front</button><button data-camera="fit" title="Fit all visible parts">Fit</button></div>
     <div class="viewport3d-overlay v3d-top-right">
       <button class="v3d-btn" id="v3dResetCam" title="Reset camera view">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5M21 21v-5h-5"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L3 8m18 8-2.64 2.36A9 9 0 0 1 3.51 15"/></svg>
@@ -405,8 +406,8 @@
       <div class="v3d-empty-icon">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
       </div>
-      <p>Click any part in the library to place it</p>
-      <small>Rotate: left-drag · Pan: right-drag / shift+drag · Zoom: wheel</small>
+      <p>Your next assembly starts here.</p>
+      <small>Choose a part from the library.<br>Preview its size, then make it yours.</small>
     </div>
   </div>
 
@@ -429,8 +430,9 @@
       <button id="ispSync">Sync BOM</button>
     </div>
   </div>
+  <div class="workbenchStatus"><span><i aria-hidden="true"></i> Millimetres · reference meshes</span><span class="tb-coords" id="v3dCoords">X — · Y — · Z — mm</span><button id="workbenchShortcuts">Mouse & keyboard controls ↗</button></div>
 
-</div>`;
+</div><div class="workbenchCompanion"><h3>More engineering tools</h3><p>Import, validate and extend your project. These tools are also available in Find a tool.</p>${companionTools}</div>`;
   }
 
   /* ─── Scene Persistence Per Project ──────────────────────────── */
@@ -534,22 +536,22 @@
     renderer.setSize(W, H, false);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = T.PCFSoftShadowMap;
-    renderer.setClearColor(0x141c18);
+    renderer.setClearColor(0x1c282f);
     renderer.toneMapping = T.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
 
     attachCanvas();
 
     scene = new T.Scene();
-    scene.fog = new T.Fog(0x141c18, 90, 220);
+    scene.fog = new T.Fog(0x1c282f, 90, 220);
 
     camera = new T.PerspectiveCamera(45, W / H, 0.01, 100000);
     camera.position.set(8, 6, 10);
     camera.lookAt(0, 0, 0);
 
     // Lights
-    scene.add(new T.AmbientLight(0xd4eade, 0.95));
-    scene.add(new T.HemisphereLight(0xe4f0eb,0x75917d,1.1));
+    scene.add(new T.AmbientLight(0xe5ebed, 0.95));
+    scene.add(new T.HemisphereLight(0xf3f6ff,0x7f9097,1.1));
     const sun = new T.DirectionalLight(0xffffff, 1.25);
     sun.position.set(12, 22, 12);
     sun.castShadow = true;
@@ -557,18 +559,18 @@
     ['left', 'right', 'top', 'bottom'].forEach((k, i) => { sun.shadow.camera[k] = [-20, 20, 20, -20][i]; });
     scene.add(sun);
 
-    const fill = new T.DirectionalLight(0x8daea5, 0.75);
+    const fill = new T.DirectionalLight(0xb4c9e0, 0.75);
     fill.position.set(-10, 6, -10);
     scene.add(fill);
 
     // Ground plane & grid
-    gridHelper = new T.GridHelper(40, 40, 0x22382e, 0x182820);
+    gridHelper = new T.GridHelper(40, 40, 0x526570, 0x354951);
     gridHelper.position.y = -0.005;
     scene.add(gridHelper);
 
     const ground = new T.Mesh(
-      new T.PlaneGeometry(80, 80),
-      new T.MeshStandardMaterial({ color: 0x24372b, roughness: 1.0, metalness: 0.0 })
+      new T.PlaneGeometry(2000, 2000),
+      new T.MeshStandardMaterial({ color: 0x293b45, roughness: 1.0, metalness: 0.0 })
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.01;
@@ -679,7 +681,7 @@
   function focusSelected(){if(!selectedIds.size)return _toast('Click a part to focus it.');const bounds=new window.THREE.Box3();objects.filter(o=>selectedIds.has(o.id)).forEach(o=>{if(o.visible)o.obj3d.visible=true;bounds.union(new window.THREE.Box3().setFromObject(o.obj3d));});frameBounds(bounds);hint('Focused on '+(selectedIds.size===1?objects.find(o=>selectedIds.has(o.id))?.name:selectedIds.size+' parts')+'. Wheel or pinch to zoom.');}
   function isolateSelected(){if(!selectedIds.size)return _toast('Select a part or group to isolate.');stopAttachment(false);assembledView();isolationIds=new Set(selectedIds);objects.forEach(o=>o.obj3d.visible=o.visible&&isolationIds.has(o.id));focusSelected();hint('Only your selection is shown. Show all restores the assembly; exports still use saved visibility.');}
   function showAllParts(){stopAttachment(false);isolationIds=null;assembledView();const changed=objects.some(o=>!o.visible);objects.forEach(o=>{o.visible=true;o.obj3d.visible=true;});if(changed)saveScene();refreshAsm();renderInsp();fitAssembly();hint('All parts are visible. Click a part to customize it.');}
-  function toggleWorkspaceFocus(force){focusMode=typeof force==='boolean'?force:!focusMode;document.body.classList.toggle('studioFocus',focusMode);const exit=document.getElementById('leaveWorkspaceFocus');if(exit)exit.hidden=!focusMode;requestAnimationFrame(()=>{const vp=document.getElementById('vp3d');if(vp&&renderer&&camera){renderer.setSize(vp.clientWidth,vp.clientHeight,false);camera.aspect=vp.clientWidth/vp.clientHeight;camera.updateProjectionMatrix();}});}
+  function toggleWorkspaceFocus(force){focusMode=typeof force==='boolean'?force:!focusMode;document.body.classList.toggle('studioFocus',focusMode);const exit=document.getElementById('leaveWorkspaceFocus');if(exit)exit.hidden=!focusMode;const button=document.getElementById('focusWorkbench');if(button){button.innerHTML=focusMode?'⤡ <span>Restore</span>':'⤢ <span>Expand</span>';button.setAttribute('aria-pressed',String(focusMode));}requestAnimationFrame(()=>{const vp=document.getElementById('vp3d');if(vp&&renderer&&camera){renderer.setSize(vp.clientWidth,vp.clientHeight,false);camera.aspect=vp.clientWidth/vp.clientHeight;camera.updateProjectionMatrix();if(focusMode&&!attachment&&objects.length){const bounds=new window.THREE.Box3();objects.filter(o=>o.obj3d.visible).forEach(o=>bounds.union(new window.THREE.Box3().setFromObject(o.obj3d)));frameBounds(bounds);}}});}
   function detachSelected(){try{stopAttachment(false);const data=sceneData(),ids=new Set(selectedIds),removed=(data.joints||[]).filter(j=>ids.has(j.child)&&!ids.has(j.parent));if(!removed.length)throw Error('The selected parts have no incoming attachment to detach.');data.joints=data.joints.filter(j=>!removed.includes(j));commitAssembly(data,[...ids]);hint('Detached. You can drag this part or attach it to another face.');}catch(e){_toast(e.message);}}
   function surfacePick(event,excluded=new Set()){
     if(!raycaster||!camera)return null;const canvas=document.getElementById('v3dCanvas'),rect=canvas?.getBoundingClientRect();if(!rect?.width||event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)return null;raycaster.setFromCamera({x:(event.clientX-rect.left)/rect.width*2-1,y:-(event.clientY-rect.top)/rect.height*2+1},camera);
@@ -711,6 +713,76 @@
   }
 
   /* Persistent assembly operations. All mutations pass the same project validator. */
+  const workbenchCommands=[
+    ['tb-model','Create a custom solid','Model','Draw a sketch, extrude and edit features'],
+    ['tb-edit-model','Edit selected solid','Model','Profile, depth and feature history'],
+    ['openMeshImport','Import STL / OBJ','Library','Bring an existing mesh into this assembly'],
+    ['openPersonalParts','My reusable parts','Library','Save and reuse your personal components'],
+    ['attachFaces','Attach two faces','Assembly','Pick moving and stationary faces; preview then apply'],
+    ['dragSnap','Drag & snap','Assembly','Drag a placed part onto another surface'],
+    ['tb-move','Move selected parts','Transform','Position with the 3D arrows or numeric inspector'],
+    ['tb-rotate','Rotate selected parts','Transform','Rotate with the 3D rings or numeric inspector'],
+    ['tb-dup','Duplicate selected parts','Assembly','Create editable copies of the selection'],
+    ['selectAllParts','Select all parts','Assembly','Build a multiple selection for shared edits'],
+    ['groupParts','Group selected parts','Assembly','Keep a set of components together'],
+    ['ungroupParts','Ungroup selected parts','Assembly','Release an assembly group'],
+    ['alignParts','Align selected parts','Assembly','Use the axis and edge set in Assembly tools'],
+    ['pickMeasure','Measure two surface points','Validate','Pick mesh points and read their distance'],
+    ['savePersonalPart','Save part to personal library','Library','Reuse the active part in another project'],
+    ['jumpCustomize','Customize selected part','Inspect','Jump to dimensions, position and materials'],
+    ['jumpAssembly','Find a placed part','Inspect','Jump to the searchable assembly tree'],
+    ['focusSelected','Focus selected parts','View','Frame the selection without changing the model'],
+    ['isolateSelected','Isolate selected parts','View','Temporarily hide the rest of the assembly'],
+    ['showAllParts','Show all parts','View','Exit temporary isolation'],
+    ['tb-fit','Fit assembly','View','Frame every visible part'],
+    ['tb-top','Top camera','View','Look down on the assembly'],
+    ['tb-front','Front camera','View','Look at the front of the assembly'],
+    ['tb-iso','Isometric camera','View','See the assembly in three dimensions'],
+    ['tb-explode','Exploded view','View','Separate components for inspection'],
+    ['tb-wireframe','Wireframe display','View','Toggle mesh edges for all parts'],
+    ['faceWorkPlane','Model on a face','Model','Create a sketch plane from a mesh face'],
+    ['tb-extrude2d','Extrude the project sketch','Model','Turn supported 2D shapes into 3D parts'],
+    ['inspectManufacturing','Inspect mesh & mass','Validate','Topology and physical property estimates'],
+    ['manufacturingTools','Fit & mesh tools','Validate','Clearance, walls, repair and tolerances'],
+    ['engineeringLab','Engineering calculation lab','Calculate','Loads, circuits, thermal and flight estimates'],
+    ['projectServices','AI & team services','Services','Configured backend required for cloud features'],
+    ['tb-stl','Export STL','Export','Visible parts, millimetres, Z-up'],
+    ['tb-obj','Export OBJ','Export','Grouped visible part meshes'],
+    ['tb-syncbom','Sync bill of materials','Export','Update the project component list'],
+    ['tb-undo','Undo 3D edit','History','Restore the previous project state'],
+    ['tb-redo','Redo 3D edit','History','Reapply an undone edit']
+  ];
+  function findWorkbenchTool(){
+    const project=current.id;
+    modal('Find a workspace tool',`<div class="workbenchFinder"><label for="workbenchToolQuery">What would you like to do?</label><input id="workbenchToolQuery" type="search" placeholder="Try attach, import or export…" autocomplete="off"><p class="finderHint">↑ ↓ to navigate · Enter to run · Esc to close</p><div id="workbenchToolResults" aria-label="Matching workspace tools"></div><p id="workbenchToolCount" role="status"></p></div>`,()=>false);
+    document.querySelector('#modalForm>button[type=submit]').style.display='none';
+    const dialog=document.getElementById('dialog'),query=document.getElementById('workbenchToolQuery'),results=document.getElementById('workbenchToolResults');
+    const show=()=>{const q=query.value.trim().toLowerCase(),entries=workbenchCommands.filter(row=>row.join(' ').toLowerCase().includes(q));results.innerHTML=entries.map(([id,label,group,detail])=>`<button type="button" data-run-workbench="${id}" ${document.getElementById(id)?.disabled?'disabled':''}><span class="finderGroup">${group}</span><span><strong>${esc(label)}</strong><small>${esc(detail)}</small></span><span aria-hidden="true">↵</span></button>`).join('')||'<div class="finderEmpty">No matching tool. Try “attach”, “solid” or “export”.</div>';document.getElementById('workbenchToolCount').textContent=entries.length+' matching tools';results.querySelectorAll('[data-run-workbench]').forEach(button=>button.onclick=()=>{if(!isActive()||current.id!==project)return _toast('The active project changed. Reopen the tool finder.');const target=document.getElementById(button.dataset.runWorkbench);dialog.close();target?.click();});};
+    query.oninput=show;
+    const keys=e=>{const buttons=[...results.querySelectorAll('button:not(:disabled)')];if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const index=buttons.indexOf(document.activeElement),next=e.key==='ArrowDown'?(index+1)%buttons.length:(index<0?buttons.length-1:(index-1+buttons.length)%buttons.length);buttons[next]?.focus();}else if(e.key==='Enter'&&document.activeElement===query){e.preventDefault();buttons[0]?.click();}};
+    query.onkeydown=keys;results.onkeydown=keys;show();query.focus();
+  }
+  function workbenchHelp(){
+    modal('Make yourself at home',`<div class="workbenchHelp"><p>Start with a library part or draw a custom solid. Click a part in the canvas to edit its size, position and material.</p><div class="helpSteps"><article><span>01</span><strong>Choose & customize</strong><p>Use Preview & size to inspect a part before adding it. Switch between card and list views in the library.</p></article><article><span>02</span><strong>Connect your parts</strong><p>Attach faces guides you through two face picks and a preview. Drag & snap places a part on another surface. Detach a locked part before moving it.</p></article><article><span>03</span><strong>Review & export</strong><p>Use Inspect & mass and Fit & mesh tools, then export STL or OBJ. Reference meshes need external manufacturing review.</p></article></div><dl><dt>Orbit</dt><dd>Drag empty canvas space</dd><dt>Pan</dt><dd>Right drag or Shift + drag</dd><dt>Zoom</dt><dd>Mouse wheel / two-finger pinch</dd><dt>Multiple selection</dt><dd>Shift / Ctrl / Command + click a part</dd><dt>Top / Front / Iso</dt><dd><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></dd><dt>Focus selection / assembly</dt><dd><kbd>F</kbd></dd><dt>Find a tool</dt><dd><kbd>Ctrl /</kbd> or <kbd>⌘ /</kbd></dd><dt>Cancel attachment / exit expanded view</dt><dd><kbd>Esc</kbd></dd></dl></div>`,()=>false);
+    document.querySelector('#modalForm>button[type=submit]').style.display='none';
+  }
+  function reflectMobilePanel(){const root=document.getElementById('editor3d');if(root)document.querySelectorAll('[data-workspace-panel]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.workspacePanel===root.dataset.mobilePanel)));}
+  function bindWorkbench(){
+    if(!document.getElementById('findWorkbenchTool'))return;
+    document.getElementById('findWorkbenchTool').onclick=findWorkbenchTool;
+    document.getElementById('workbenchHelp').onclick=workbenchHelp;
+    document.getElementById('workbenchShortcuts').onclick=workbenchHelp;
+    document.getElementById('focusWorkbench').onclick=()=>toggleWorkspaceFocus();
+    document.getElementById('focusWorkbench').setAttribute('aria-pressed',String(focusMode));
+    for(const id of ['jumpCustomize','jumpAssembly']){const button=document.getElementById(id),action=button.onclick;button.setAttribute('aria-pressed',String(id==='jumpCustomize'));button.onclick=()=>{document.getElementById('editor3d').dataset.mobilePanel='edit';reflectMobilePanel();action?.();for(const other of ['jumpCustomize','jumpAssembly'])document.getElementById(other).setAttribute('aria-pressed',String(id===other));};}
+    const root=document.getElementById('editor3d');
+    const layout=value=>{root.dataset.libraryLayout=value==='list'?'list':'cards';document.getElementById('libraryGrid').setAttribute('aria-pressed',String(value!=='list'));document.getElementById('libraryList').setAttribute('aria-pressed',String(value==='list'));};
+    let savedLayout='cards';try{savedLayout=localStorage.getItem('studio-library-layout-v1')||'cards';}catch{}layout(savedLayout);
+    for(const [id,value] of [['libraryGrid','cards'],['libraryList','list']])document.getElementById(id).onclick=()=>{layout(value);try{localStorage.setItem('studio-library-layout-v1',value);}catch{_toast('View changed for this session. Browser storage is unavailable.');}};
+    document.querySelectorAll('[data-camera]').forEach(button=>button.onclick=()=>{if(button.dataset.camera==='fit')fitAssembly();else setCam(button.dataset.camera);});
+    document.querySelectorAll('[data-workspace-panel]').forEach(button=>{const action=button.onclick;button.onclick=()=>{action?.();reflectMobilePanel();};});reflectMobilePanel();
+    const grid=document.getElementById('v3dGridBtn');grid.setAttribute('aria-pressed',String(gridHelper?.visible!==false));
+  }
   function matrixOf(position,rotation){const T=window.THREE;return new T.Matrix4().compose(new T.Vector3(...position),new T.Quaternion().setFromEuler(new T.Euler(...rotation.map(v=>v*Math.PI/180))),new T.Vector3(1,1,1));}
   function setMatrixRecord(record,matrix){const T=window.THREE,p=new T.Vector3(),q=new T.Quaternion(),s=new T.Vector3();matrix.decompose(p,q,s);const e=new T.Euler().setFromQuaternion(q);record.position=p.toArray();record.rotation=[e.x,e.y,e.z].map(v=>v*180/Math.PI);}
   function solveJoints(data){
@@ -768,7 +840,7 @@
   function select(id,additive=false,individual=false) {
     if(!additive)selectedIds.clear();
     if(id){const group=individual?null:assemblyGroups.find(g=>g.members.includes(id));const ids=group?group.members:[id];const remove=additive&&ids.every(i=>selectedIds.has(i));ids.forEach(i=>remove?selectedIds.delete(i):selectedIds.add(i));}
-    if(id&&!attachment&&document.getElementById('editor3d'))document.getElementById('editor3d').dataset.mobilePanel='edit';
+    if(id&&!attachment&&document.getElementById('editor3d')){document.getElementById('editor3d').dataset.mobilePanel='edit';reflectMobilePanel();}
     const target=objects.find(o=>o.id===id);if(target?.visible&&!target.obj3d.visible)setAssemblyStage(6,false);
     objects.forEach(o => o.obj3d.traverse(c => {
       if (c.isMesh && c.material?.emissive) c.material.emissive.setHex(0);
@@ -834,7 +906,7 @@
     if (!el) return;
     const rec = objects.find(o => o.id === selId);
     if (!rec) {
-      el.innerHTML = `<div class="inspector-none">Select an object to inspect its dimensions, position and material.</div>`;
+      el.innerHTML = `<div class="inspector-none"><span class="inspectorEmptyMark" aria-hidden="true">◇</span><strong>Every detail, in your control.</strong><p>Select a part in the canvas or assembly list to edit its dimensions, transforms and material.</p><ol><li>Add a part from the library</li><li>Click it to customize</li><li>Attach it to your assembly</li></ol></div>`;
       return;
     }
     const d = rec.def.dims;
@@ -842,13 +914,13 @@
       `<div class="dim-field"><label for="dim_${k}">${DIM_LABELS[k] || k}</label><input type="number" id="dim_${k}" value="${v}" min="${k==='teeth'?6:0.1}" max="${k==='teeth'?120:5000}" step="${k==='teeth'?1:0.1}"></div>`
     ).join('');
     const matBtns = Object.keys(MAT_COLORS).map(m =>
-      `<button class="mat-btn${rec.def.mat === m ? ' active' : ''}" data-mat="${m}">${m}</button>`
+      `<button class="mat-btn${rec.def.mat === m ? ' active' : ''}" aria-pressed="${rec.def.mat===m}" data-mat="${m}"><i style="background:${hex(MAT_COLORS[m])}" aria-hidden="true"></i>${m}</button>`
     ).join('');
     const pos = rec.obj3d.position;
     const rot = rec.obj3d.rotation;
 
     el.innerHTML = `
-      <div class="selectedPartTitle">${esc(rec.name)}</div>
+      <div class="selectedPartTitle"><span class="workbenchEyebrow">${selectedIds.size>1?selectedIds.size+' SELECTED · ACTIVE PART':'SELECTED PART'}</span><strong>${esc(rec.name)}</strong><small>${esc(rec.def.mat)} · ${rec.def.mesh?'Imported mesh':rec.def.model?'Editable solid':'Parametric concept part'}</small></div>
       <div class="inspector-section">${assemblyJoints.some(j=>j.child===rec.id)?'<p class="attachedPartNote">Attached: Detach before moving. After resizing, recheck the contact.</p>':''}<div class="selectionShortcuts"><button id="insp-focus">Focus</button><button id="insp-attach">Attach</button><button id="insp-detach" ${assemblyJoints.some(j=>j.child===rec.id)?'':'disabled'}>Detach</button></div><h4>Dimensions · mm</h4>
         <div class="dim-grid">${dimRows}</div>
         <button class="dim-apply" id="applyDims">↻ Rebuild geometry</button>
@@ -1328,9 +1400,10 @@
     });
     on('v3dGridBtn', () => {
       if (gridHelper) gridHelper.visible = !gridHelper.visible;
+      document.getElementById('v3dGridBtn').setAttribute('aria-pressed',String(gridHelper?.visible!==false));
     });
 
-    bindUsability();
+    bindUsability();bindWorkbench();
     // Parts catalogue insertion
     document.querySelectorAll('[data-insert]').forEach(el =>
       el.onclick=()=>place(el.dataset.insert)
@@ -1371,6 +1444,10 @@
       if(!isActive()||!editorReady||document.getElementById('dialog')?.open||e.target.isContentEditable)return;
       if(e.key==='Escape'&&(attachment||focusMode)){e.preventDefault();if(attachment)stopAttachment();else toggleWorkspaceFocus(false);return;}
       if (e.target.closest('input, textarea, select')) return;
+      if((e.ctrlKey||e.metaKey)&&e.key==='/'){e.preventDefault();findWorkbenchTool();return;}
+      if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='d'){e.preventDefault();dupSelected();return;}
+      // Preserve browser find, save, print and tab shortcuts. Plain tool keys are local.
+      if(e.ctrlKey||e.metaKey||e.altKey)return;
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); delSelected(); }
       else if (e.key === 'Escape') { facePicking=false;if(attachment)stopAttachment();else if(focusMode)toggleWorkspaceFocus(false);else select(null); }
       else if (e.key === '1') { setCam('top'); }
@@ -1379,7 +1456,6 @@
       else if(e.key.toLowerCase()==='f'){if(selectedIds.size)focusSelected();else fitAssembly();}
       else if (e.key.toLowerCase() === 'o') { setMode('orbit'); }
       else if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey) { setMode('select'); }
-      else if (e.key.toLowerCase() === 'd' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); dupSelected(); }
       else if (e.key.toLowerCase() === 'w') {
         objects.forEach(o => {
           o.wireframe = !o.wireframe;
