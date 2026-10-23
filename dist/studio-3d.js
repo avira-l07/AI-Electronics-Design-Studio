@@ -82,6 +82,7 @@
   let renderer = null, scene = null, camera = null, controls = null, raf = null;
   let objects = [];          // placed scene objects
   let selId = null;          // selected id
+  let selectedIds=new Set(),assemblyGroups=[],assemblyJoints=[],multiPivot=null,measurePoints=[],measureMode=false,measureLine=null;
   let mode = 'orbit';        // 'orbit' | 'select'
   let gridHelper = null, raycaster = null, vpObserver = null;
   let editorReady = false;
@@ -96,6 +97,7 @@
   function build(p){
     if(!StudioAssembly.dimensions(p.id,p.dims))throw Error('Invalid dimensions for this part. Check bore, wall thickness and size limits.');
     if(p.id==='custom_solid'&&!StudioSolidModel.validate(p.model,p.dims.depth))throw Error('Invalid custom solid recipe.');
+    if(p.id==='imported_mesh'&&!StudioMeshParts.validate(p.mesh))throw Error('Invalid imported mesh.');
     const root=new window.THREE.Group();root.add(buildGeometry(p));return root;
   }
   function ring(outer,inner,length,mat,sides=48){
@@ -110,6 +112,7 @@
   function buildGeometry(p) {
     const T = window.THREE;
     const d = p.dims;
+    if(p.id==='imported_mesh')return new T.Mesh(StudioMeshParts.geometry(T,p.mesh,p.dims.scale),new T.MeshStandardMaterial({color:MAT_COLORS[p.mat]||0xa8b8c8,metalness:.3,roughness:.5,side:T.DoubleSide}));
     const col = p.col !== undefined ? p.col : (MAT_COLORS[p.mat] || 0x8a9a8a);
     const mat = (c = col) => new T.MeshStandardMaterial({color:c,metalness:['Steel','Brass','Aluminium 6061','Aluminium / Steel'].includes(p.mat)?0.7:0.05,roughness:p.mat==='ABS polymer'?0.7:0.36});
     const box = (w, h, l, x = 0, y = 0, z = 0, c) => {
@@ -331,7 +334,7 @@
       `<button id="${id}" class="${active}" title="${label}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${svgPath}"/></svg> ${label}</button>`;
 
     return `
-<div class="v3dCreateBar"><button class="primary" id="startCustomSolid">＋ Draw your own 3D part</button><span>Profile → extrude → cut / join → edit → save</span><a href="#/templates">Browse assembly starters →</a></div><p class="v3dDisclaimer">Custom solids retain editable modelling recipes. Catalogue parts remain simplified concept meshes. Exports: visible parts, mm, Z-up; physical fits and manufacturing readiness require review.</p>${assemblyGuide()}<div class="editor3d" id="editor3d">
+<div class="v3dCreateBar"><button class="primary" id="startCustomSolid">＋ Draw your own 3D part</button><button id="openMeshImport">Import STL / OBJ</button><button id="openPersonalParts">My reusable parts</button><span>Draw · assemble · measure · save</span><a href="#/templates">Browse assembly starters →</a></div><p class="v3dDisclaimer">Custom solids retain editable modelling recipes. Catalogue and imported parts are concept meshes. Exports: visible parts, mm, Z-up; physical fits and manufacturing readiness require review.</p>${assemblyGuide()}<div class="editor3d" id="editor3d">
 
   <!-- Toolbar -->
   <div class="editor3d-toolbar">
@@ -404,11 +407,11 @@
 
   <!-- Inspector -->
   <div class="editor3d-inspector">
+    <div class="inspector-head">ASSEMBLY TREE</div>
+    <div class="assembly-list" id="asmList"></div>
+    <div id="assemblyTools"></div>
     <div class="inspector-head">INSPECTOR</div>
     <div id="insp3d"><div class="inspector-none">Select an object to inspect its dimensions, position and material.</div></div>
-
-    <div style="padding:10px 14px 4px;font-size:9px;letter-spacing:1.4px;color:#4a7060;border-top:1px solid #1e2e28">ASSEMBLY TREE</div>
-    <div class="assembly-list" id="asmList"></div>
 
     <div class="asm-bom">
       <h4>Quick BOM</h4>
@@ -426,17 +429,20 @@
   }
 
   /* ─── Scene Persistence Per Project ──────────────────────────── */
-  function sceneData(){return {version:1,units:'mm',objects:objects.map(o=>({id:o.id,partId:o.def.id,name:o.name,dims:structuredClone(o.def.dims),...(o.def.model?{model:structuredClone(o.def.model)}:{}),material:o.def.mat,position:(o._prePos&&exploded?o._prePos:o.obj3d.position).toArray().map(v=>v*10),rotation:[o.obj3d.rotation.x,o.obj3d.rotation.y,o.obj3d.rotation.z].map(v=>v*180/Math.PI),visible:o.visible,wireframe:o.wireframe}))};}
+  function sceneData(){return {version:1,units:'mm',...(assemblyGroups.length?{groups:structuredClone(assemblyGroups)}:{}),...(assemblyJoints.length?{joints:structuredClone(assemblyJoints)}:{}),objects:objects.map(o=>({id:o.id,partId:o.def.id,name:o.name,dims:structuredClone(o.def.dims),...(o.def.model?{model:structuredClone(o.def.model)}:{}),...(o.def.mesh?{mesh:structuredClone(o.def.mesh)}:{}),material:o.def.mat,position:(o._prePos&&exploded?o._prePos:o.obj3d.position).toArray().map(v=>v*10),rotation:[o.obj3d.rotation.x,o.obj3d.rotation.y,o.obj3d.rotation.z].map(v=>v*180/Math.PI),visible:o.visible,wireframe:o.wireframe}))};}
   let loadedProjectId=null,loadedSignature=null,entrySequence=0,sceneBlocked=false;
   function saveScene(){
     if(sceneBlocked||!current?.id||current.id!==loadedProjectId)return false;
     const data=sceneData();
+    try{solveJoints(data);}catch(e){_toast(e.message);return false;}
     if(!StudioAssembly.validate(data)){_toast('Invalid assembly values. Correct the edit before saving.');return false;}
     current.assembly3d=data;loadedSignature=JSON.stringify(data);
+    for(const item of data.objects){const o=objects.find(o=>o.id===item.id);if(!exploded){o.obj3d.position.fromArray(item.position.map(v=>v/10));o.obj3d.rotation.set(...item.rotation.map(v=>v*Math.PI/180));}}
     const result=persist();
     refreshAssemblyGuide();
     refreshUndoButtons();
-    return result;
+    renderAssemblyTools();
+    return result!==false;
   }
   function disposeObject(object){
     const geometries=new Set(),materials=new Set();
@@ -458,19 +464,20 @@
       }}
     }
     if(!StudioAssembly.validate(data))throw Error('Invalid 3D assembly. Export the project before recovery.');
+    data=structuredClone(data);solveJoints(data);if(!StudioAssembly.validate(data))throw Error('Joint positions exceed the supported assembly limits.');
     const signature=JSON.stringify(data);
     if(loadedProjectId===current.id&&loadedSignature===signature){setAssemblyStage(6,false);return;}
     const next=[];
     try{for(const item of data.objects){
-      const base=ALL_PARTS.find(p=>p.id===item.partId),def={...structuredClone(base),dims:structuredClone(item.dims),...(item.model?{model:structuredClone(item.model)}:{}),mat:item.material,col:MAT_COLORS[item.material]};
+      const base=ALL_PARTS.find(p=>p.id===item.partId)||{id:'imported_mesh',name:'Imported mesh',icon:'enclosure'},def={...structuredClone(base),dims:structuredClone(item.dims),...(item.model?{model:structuredClone(item.model)}:{}),...(item.mesh?{mesh:structuredClone(item.mesh)}:{}),mat:item.material,col:MAT_COLORS[item.material]};
       const obj3d=build(def);obj3d.position.fromArray(item.position.map(v=>v/10));obj3d.rotation.set(...item.rotation.map(v=>v*Math.PI/180));
       const record={id:item.id,name:item.name,def,obj3d,visible:item.visible,wireframe:item.wireframe};applyRecordAppearance(record);next.push(record);
     }}catch(error){next.forEach(o=>disposeObject(o.obj3d));throw error;}
-    clearSceneObjects();objects=next;objects.forEach(o=>scene.add(o.obj3d));loadedProjectId=current.id;loadedSignature=signature;
+    clearSceneObjects();objects=next;assemblyGroups=structuredClone(data.groups||[]);assemblyJoints=structuredClone(data.joints||[]);objects.forEach(o=>scene.add(o.obj3d));loadedProjectId=current.id;loadedSignature=signature;
     select(null);updateEmpty();refreshAsm();refreshBom();refreshAssemblyGuide();
     if(migrated){current.assembly3d=data;persist();_toast('Legacy 3D scene added to the project. Its original browser copy is retained.');}
   }
-  function clearSceneObjects(){loadedProjectId=null;loadedSignature=null;objects.forEach(o=>{scene.remove(o.obj3d);disposeObject(o.obj3d)});objects=[];selId=null;exploded=false;assemblyStage=6;}
+  function clearSceneObjects(){loadedProjectId=null;loadedSignature=null;objects.forEach(o=>{scene.remove(o.obj3d);disposeObject(o.obj3d)});objects=[];selId=null;selectedIds.clear();assemblyGroups=[];assemblyJoints=[];clearMeasurement();exploded=false;assemblyStage=6;transformControls?.detach();if(multiPivot){scene.remove(multiPivot);multiPivot=null;}}
   function assembledView(){if(exploded)toggleExplode();if(assemblyStage!==6)setAssemblyStage(6,false);}
   function applyRecordAppearance(rec){
     rec.obj3d.visible=rec.visible;
@@ -567,9 +574,10 @@
     controls = new T.OrbitControls(camera, renderer.domElement);
     controls.minDistance=.5;controls.maxDistance=50000;controls.maxPolarAngle=Math.PI*.95;
     transformControls=new T.TransformControls(camera,renderer.domElement);transformControls.setSize(.8);scene.add(transformControls);
-    transformControls.addEventListener('mouseDown',()=>{const rec=objects.find(o=>o.id===selId);if(rec)dragStart={id:rec.id,position:rec.obj3d.position.clone(),rotation:rec.obj3d.rotation.clone()};});
+    transformControls.addEventListener('mouseDown',()=>{const rec=objects.find(o=>o.id===selId);if(rec){const target=selectedIds.size>1?multiPivot:rec.obj3d;target.updateMatrixWorld(true);dragStart={id:rec.id,data:sceneData(),matrix:target.matrixWorld.clone(),position:rec.obj3d.position.clone(),rotation:rec.obj3d.rotation.clone()};}});
+    transformControls.addEventListener('objectChange',()=>{if(!dragStart||selectedIds.size<2)return;multiPivot.updateMatrixWorld(true);const delta=new window.THREE.Matrix4().multiplyMatrices(multiPivot.matrixWorld,dragStart.matrix.clone().invert());for(const item of dragStart.data.objects.filter(o=>selectedIds.has(o.id))){const record=objects.find(o=>o.id===item.id),next={};setMatrixRecord(next,delta.clone().multiply(matrixOf(item.position.map(v=>v/10),item.rotation)));record.obj3d.position.fromArray(next.position);record.obj3d.rotation.set(...next.rotation.map(v=>v*Math.PI/180));}});
     transformControls.addEventListener('dragging-changed',e=>{controls.enabled=!e.value&&mode==='orbit';});
-    transformControls.addEventListener('mouseUp',()=>{const rec=objects.find(o=>o.id===dragStart?.id);if(!rec)return;const position=rec.obj3d.position.toArray(),rotation=[rec.obj3d.rotation.x,rec.obj3d.rotation.y,rec.obj3d.rotation.z];if(position.some(v=>!Number.isFinite(v)||Math.abs(v)>10000)||rotation.some(v=>!Number.isFinite(v)||Math.abs(v)>Math.PI*20)){rec.obj3d.position.copy(dragStart.position);rec.obj3d.rotation.copy(dragStart.rotation);_toast('Transform exceeds the supported position or rotation limits.');}else saveScene();dragStart=null;renderInsp();});
+    transformControls.addEventListener('mouseUp',()=>{if(!dragStart)return;const before=dragStart.data,ids=[...selectedIds];try{const candidate=sceneData();solveJoints(candidate);if(!StudioAssembly.validate(candidate))throw Error('Transform exceeds the assembly limits.');saveScene();}catch(e){current.assembly3d=before;loadedSignature=null;loadScene();for(const id of ids)select(id,true,true);_toast(e.message+' Previous assembly restored.');}dragStart=null;renderInsp();renderAssemblyTools();syncTransformHandles();});
     renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();editorReady=false;pauseEditor();const load=document.getElementById('v3dLoad');if(load){load.style.display='flex';load.textContent='Graphics context lost. Waiting for the browser to restore it…';}});
     renderer.domElement.addEventListener('webglcontextrestored',()=>{editorReady=true;if(isActive())enterEditor();});
     raycaster = new T.Raycaster();
@@ -651,22 +659,77 @@
     _toast('Placed: ' + rec.name);
   }
 
+  /* Persistent assembly operations. All mutations pass the same project validator. */
+  function matrixOf(position,rotation){const T=window.THREE;return new T.Matrix4().compose(new T.Vector3(...position),new T.Quaternion().setFromEuler(new T.Euler(...rotation.map(v=>v*Math.PI/180))),new T.Vector3(1,1,1));}
+  function setMatrixRecord(record,matrix){const T=window.THREE,p=new T.Vector3(),q=new T.Quaternion(),s=new T.Vector3();matrix.decompose(p,q,s);const e=new T.Euler().setFromQuaternion(q);record.position=p.toArray();record.rotation=[e.x,e.y,e.z].map(v=>v*180/Math.PI);}
+  function solveJoints(data){
+    const T=window.THREE,map=new Map(data.objects.map(o=>[o.id,o])),done=new Set(),visiting=new Set(),parents=new Map((data.joints||[]).map(j=>[j.child,j]));
+    function visit(id){if(done.has(id))return;if(visiting.has(id))throw Error('Cyclic joints are not supported.');visiting.add(id);const joint=parents.get(id);if(joint){visit(joint.parent);const parent=map.get(joint.parent),child=map.get(id);if(!parent||!child)throw Error('A joint references a missing part.');const axis=new T.Vector3(...['X','Y','Z'].map(a=>a===joint.axis?1:0)),motion=new T.Matrix4();if(joint.type==='hinge')motion.makeRotationAxis(axis,joint.value*Math.PI/180);if(joint.type==='slider')motion.makeTranslation(...axis.multiplyScalar(joint.value).toArray());setMatrixRecord(child,matrixOf(parent.position,parent.rotation).multiply(motion).multiply(matrixOf(joint.offset,joint.orientation)));}visiting.delete(id);done.add(id);}
+    for(const id of map.keys())visit(id);return data;
+  }
+  function commitAssembly(data,selection=[]){
+    if(sceneBlocked||current?.id!==loadedProjectId)throw Error('Reopen the active 3D project first.');
+    solveJoints(data);if(!StudioAssembly.validate(data))throw Error('The edit exceeds assembly, transform or geometry limits.');
+    const previous=current.assembly3d;try{current.assembly3d=data;loadedSignature=null;loadScene();select(null);for(const id of selection)select(id,true,true);saveScene();}catch(e){current.assembly3d=previous;loadedSignature=null;loadScene();throw e;}
+  }
+  function editableSelection(data){if(!selectedIds.size)throw Error('Select parts using the tree checkboxes or Ctrl-click.');if((data.joints||[]).some(j=>selectedIds.has(j.child)&&!selectedIds.has(j.parent)))throw Error('This part is joint-driven. Adjust or remove its joint before moving or aligning it.');return data.objects.filter(o=>selectedIds.has(o.id));}
+  function groupSelection(){const data=sceneData(),ids=[...selectedIds];if(ids.length<2)throw Error('Select at least two parts to group.');if((data.groups||[]).some(g=>g.members.some(id=>selectedIds.has(id))))throw Error('Ungroup existing members before making a new group.');data.groups=[...(data.groups||[]),{id:uid(),name:'Group '+((data.groups||[]).length+1),members:ids}];commitAssembly(data,ids);}
+  function ungroupSelection(){const data=sceneData();data.groups=(data.groups||[]).filter(g=>!g.members.some(id=>selectedIds.has(id)));commitAssembly(data,[...selectedIds]);}
+  function translateSelection(delta){const data=sceneData();if(delta.some(n=>!Number.isFinite(n)||Math.abs(n)>100000))throw Error('Use finite millimetre offsets within ±100000.');for(const o of editableSelection(data))o.position=o.position.map((v,i)=>v+delta[i]);commitAssembly(data,[...selectedIds]);}
+  function alignSelection(axis,edge){const data=sceneData(),items=editableSelection(data);if((data.joints||[]).some(j=>selectedIds.has(j.child)))throw Error('Detach joint-driven parts before aligning individual component bounds.');if(items.length<2)throw Error('Select two or more parts; the last selected part is the alignment reference.');const reference=objects.find(o=>o.id===selId),bounds=o=>new window.THREE.Box3().setFromObject(o.obj3d),value=b=>edge==='min'?b.min[axis]:edge==='max'?b.max[axis]:(b.min[axis]+b.max[axis])/2;const target=value(bounds(reference));for(const item of items){if(item.id===reference.id)continue;item.position['xyz'.indexOf(axis)]+=(target-value(bounds(objects.find(o=>o.id===item.id))))*10;}commitAssembly(data,[...selectedIds]);}
+  function createJoint(type,axis,min,max){const data=sceneData(),ids=[...selectedIds];if(ids.length!==2)throw Error('Select exactly two parts: parent first, child second.');const [parent,child]=ids.map(id=>data.objects.find(o=>o.id===id));if((data.joints||[]).some(j=>j.child===child.id))throw Error('Remove the child’s existing joint first.');if(!Number.isFinite(min)||!Number.isFinite(max)||min>0||max<0||min>max)throw Error('Joint limits must include the initial value 0.');const local=matrixOf(parent.position,parent.rotation).invert().multiply(matrixOf(child.position,child.rotation)),relative={};setMatrixRecord(relative,local);data.joints=[...(data.joints||[]),{id:uid(),parent:parent.id,child:child.id,type,axis,offset:relative.position,orientation:relative.rotation,value:0,min:type==='fixed'?0:min,max:type==='fixed'?0:max}];commitAssembly(data,ids);}
+  function clearMeasurement(){measurePoints=[];if(measureLine){scene?.remove(measureLine);measureLine.geometry.dispose();measureLine.material.dispose();measureLine=null;}}
+  function drawMeasurement(){if(measureLine){scene.remove(measureLine);measureLine.geometry.dispose();measureLine.material.dispose();measureLine=null;}if(measurePoints.length===2){const T=window.THREE;measureLine=new T.Line(new T.BufferGeometry().setFromPoints(measurePoints),new T.LineBasicMaterial({color:0xf3cc78,depthTest:false}));measureLine.renderOrder=100;scene.add(measureLine);}}
+  function renderAssemblyTools(){
+    const host=document.getElementById('assemblyTools');if(!host)return;const selected=objects.filter(o=>selectedIds.has(o.id)),T=window.THREE;
+    let measure='Select a part to inspect its world bounding dimensions.';
+    if(selected.length){const b=new T.Box3();selected.forEach(o=>b.union(new T.Box3().setFromObject(o.obj3d)));const size=b.getSize(new T.Vector3()).multiplyScalar(10);measure=`World bounds: X ${size.x.toFixed(2)} · Y ${size.y.toFixed(2)} · Z ${size.z.toFixed(2)} mm`;if(selected.length===2){const boxes=selected.map(o=>new T.Box3().setFromObject(o.obj3d)),centres=boxes.map(b=>b.getCenter(new T.Vector3()));measure+=`<br>Centre distance: ${(centres[0].distanceTo(centres[1])*10).toFixed(2)} mm`;const gap=['x','y','z'].map(a=>Math.max(0,boxes[0].min[a]-boxes[1].max[a],boxes[1].min[a]-boxes[0].max[a]));measure+=`<br>Bounding-box separation: ${(Math.hypot(...gap)*10).toFixed(2)} mm (not surface clearance)`;}}
+    if(measurePoints.length===2)measure+=`<br>Picked surface points: ${(measurePoints[0].distanceTo(measurePoints[1])*10).toFixed(3)} mm`;
+    host.innerHTML=`<details class="assemblyTools" open><summary>ASSEMBLY TOOLS · ${selectedIds.size} selected</summary><p class="toolHint">Checkboxes select individual parts. Ctrl-click adds; Alt-click selects one group member. Last selected = alignment reference.</p><div class="toolButtons"><button id="selectAllParts">Select all</button><button id="clearPartSelection">Clear selection</button><button id="groupParts">Group</button><button id="ungroupParts">Ungroup</button><button id="savePersonalPart">Save part to library</button></div><div class="toolFields">${['X','Y','Z'].map(a=>`<label>Δ${a} mm<input id="batch${a}" type="number" value="0" step="0.1"></label>`).join('')}</div><button id="moveSelectedParts">Move selected</button><div class="toolFields"><label>Axis<select id="alignAxis"><option value="x">X</option><option value="y">Y</option><option value="z">Z</option></select></label><label>Align by<select id="alignEdge"><option value="center">Centre</option><option value="min">Minimum</option><option value="max">Maximum</option></select></label><button id="alignParts">Align</button></div><output id="assemblyMeasurements">${measure}</output><button id="pickMeasure">${measureMode?'Stop picking points':'Measure two surface points'}</button><button id="clearMeasure">Clear measure</button>${measureMode?'<p class="toolHint">Click two visible mesh surfaces. This is a temporary straight-line measurement.</p>':''}</details>
+      <details class="assemblyTools"><summary>JOINTS · ${assemblyJoints.length}</summary><p class="toolHint">Select parent first, child second. Hinge pivots at the parent origin; slider follows its local axis. Kinematic positioning only.</p><div class="toolFields"><label>Type<select id="jointType"><option value="fixed">Fixed</option><option value="hinge">Hinge</option><option value="slider">Slider</option></select></label><label>Local axis<select id="jointAxis"><option>X</option><option>Y</option><option>Z</option></select></label></div><div class="toolFields"><label>Minimum (° / mm)<input type="number" id="jointMin" value="-90"></label><label>Maximum (° / mm)<input type="number" id="jointMax" value="90"></label></div><button id="addJoint">Create joint</button>${assemblyJoints.map(j=>`<div class="jointRow"><b>${esc(objects.find(o=>o.id===j.child)?.name)} · ${esc(j.type)}</b><label>Value ${j.type==='slider'?'mm':'°'}<input data-joint-value="${j.id}" type="number" value="${j.value}" min="${j.min}" max="${j.max}" step="1" ${j.type==='fixed'?'disabled':''}></label><button data-joint-remove="${j.id}">Remove joint</button></div>`).join('')}</details>`;
+    const bind=(id,fn)=>{document.getElementById(id).onclick=()=>{try{assembledView();fn();}catch(e){_toast(e.message);}}};
+    bind('selectAllParts',()=>{select(null);objects.forEach(o=>select(o.id,true,true))});bind('clearPartSelection',()=>select(null));bind('groupParts',groupSelection);bind('ungroupParts',ungroupSelection);bind('moveSelectedParts',()=>translateSelection(['X','Y','Z'].map(a=>Number(document.getElementById('batch'+a).value))));bind('alignParts',()=>alignSelection(document.getElementById('alignAxis').value,document.getElementById('alignEdge').value));bind('savePersonalPart',savePersonalPart);bind('pickMeasure',()=>{measureMode=!measureMode;setMode('select');renderAssemblyTools()});bind('clearMeasure',()=>{clearMeasurement();renderAssemblyTools()});bind('addJoint',()=>createJoint(document.getElementById('jointType').value,document.getElementById('jointAxis').value,Number(document.getElementById('jointMin').value),Number(document.getElementById('jointMax').value)));
+    host.querySelectorAll('[data-joint-value]').forEach(input=>input.onchange=()=>{try{const data=sceneData(),j=data.joints.find(j=>j.id===input.dataset.jointValue);j.value=Number(input.value);commitAssembly(data,[...selectedIds]);}catch(e){_toast(e.message);renderAssemblyTools()}});
+    host.querySelectorAll('[data-joint-remove]').forEach(button=>button.onclick=()=>{try{const data=sceneData();data.joints=data.joints.filter(j=>j.id!==button.dataset.jointRemove);commitAssembly(data,[...selectedIds]);}catch(e){_toast(e.message)}});
+  }
+
+  function personalParts(){const raw=studioStorage.read('studio-personal-parts-v1');if(raw===null)return [];let rows;try{rows=JSON.parse(raw);}catch{throw Error('Personal library data needs recovery. Export the original from My reusable parts before replacing it.');}if(!Array.isArray(rows)||rows.length>24||!rows.every(o=>StudioAssembly.validate({version:1,units:'mm',objects:[o]})))throw Error('Personal library data needs recovery; its original is preserved.');return rows;}
+  function writePersonalParts(rows){if(JSON.stringify(rows).length>2000000||rows.reduce((n,o)=>n+(o.mesh?.positions.length||0)/9,0)>12000)throw Error('The personal library exceeds its 2 MB / 12,000 triangle limit. Export and remove an older part first.');try{localStorage.setItem('studio-personal-parts-v1',JSON.stringify(rows));}catch{throw Error('Browser storage is full or unavailable. Export your projects and free storage before saving a library part.');}}
+  function savePersonalPart(){if(selectedIds.size!==1)throw Error('Select one individual part to save to the reusable library.');const rows=personalParts();if(rows.length>=24)throw Error('Keep up to 24 personal parts; remove an older entry first.');const record=sceneData().objects.find(o=>o.id===selId);rows.push({...structuredClone(record),id:uid(),position:[0,0,0],rotation:[0,0,0],visible:true,wireframe:false});writePersonalParts(rows);_toast('Part saved to My reusable parts on this device. Export that library for a portable backup.');}
+  async function insertRecord(record){const project=current.id;if(record.model)await StudioSolidModel.prepare(record.model,record.dims.depth);if(current.id!==project||!isActive())throw Error('The active project changed. Reopen the library.');assembledView();const data=sceneData(),copy={...structuredClone(record),id:uid(),position:[0,0,0],rotation:[0,0,0],visible:true,wireframe:false};let right=0;objects.forEach(o=>{right=Math.max(right,new window.THREE.Box3().setFromObject(o.obj3d).max.x*10)});copy.position[0]=right+60;data.objects.push(copy);commitAssembly(data,[copy.id]);fitAssembly();}
+  function openPersonalParts(){
+    let rows,error='';try{rows=personalParts();}catch(e){error=e.message;rows=[];}
+    modal('My reusable parts',`<p>Personal parts are stored on this device, separately from project backups. Export this library to move it to another device. Imported meshes have no editable CAD history.</p><p role="alert">${esc(error)}</p><div class="personalParts">${rows.map((o,i)=>`<article><b>${esc(o.name)}</b><small>${esc(o.partId)} · ${esc(o.material)}</small><button type="button" data-personal-place="${i}">Insert</button><button type="button" data-personal-remove="${i}">Remove</button></article>`).join('')||'<p>No saved parts yet. Select one part in the assembly and choose Save part to library.</p>'}</div><button type="button" id="exportPersonal">Export library / original</button><label>Import library JSON (replaces this library)<input id="importPersonal" type="file" accept=".json"></label><p id="personalError" role="alert"></p>`,()=>{});
+    document.querySelector('#modalForm>button[type=submit]').hidden=true;const dialog=document.getElementById('dialog');dialog.addEventListener('close',()=>document.querySelector('#modalForm>button[type=submit]').hidden=false,{once:true});
+    document.getElementById('exportPersonal').onclick=()=>_download('engineering-personal-parts.json',studioStorage.read('studio-personal-parts-v1')||'[]','application/json');
+    document.querySelectorAll('[data-personal-place]').forEach(b=>b.onclick=async()=>{try{b.disabled=true;await insertRecord(rows[+b.dataset.personalPlace]);dialog.close();}catch(e){document.getElementById('personalError').textContent=e.message;}finally{b.disabled=false;}});
+    document.querySelectorAll('[data-personal-remove]').forEach(b=>b.onclick=()=>{try{rows.splice(+b.dataset.personalRemove,1);writePersonalParts(rows);dialog.close();openPersonalParts();}catch(e){document.getElementById('personalError').textContent=e.message;}});
+    document.getElementById('importPersonal').onchange=async e=>{try{const file=e.target.files[0];if(!file)return;if(file.size>2000000)throw Error('Use a library JSON below 2 MB.');const next=JSON.parse(await file.text());if(!Array.isArray(next)||next.length>24||new Set(next.map(o=>o?.id)).size!==next.length||!next.every(o=>StudioAssembly.validate({version:1,units:'mm',objects:[o]})))throw Error('Invalid personal parts library.');modal('Replace personal library?',`<p>Replace the current library with ${next.length} imported parts? Project parts are unaffected. Export your current library first if you need it.</p>`,()=>{writePersonalParts(next);return true;});document.querySelector('#modalForm>button[type=submit]').hidden=false;}catch(e){document.getElementById('personalError').textContent=e.message;}};
+  }
+  function openMeshImport(){
+    const project=current.id;
+    modal('Import STL / OBJ',`<p>Up to 2 MiB and 6,000 triangles per part; 12,000 imported triangles per assembly. OBJ faces must already be triangulated. Materials and external links are ignored.</p><label>Mesh file<input type="file" id="meshFile" accept=".stl,.obj" required></label><label>Source units<select id="meshUnits"><option value="mm">Millimetres</option><option value="cm">Centimetres</option><option value="m">Metres</option><option value="in">Inches</option></select></label><label>Source up axis<select id="meshUp"><option value="Z">Z up (STL / studio export)</option><option value="Y">Y up</option></select></label><p>The imported part is centred horizontally and placed on its base. It remains a triangle mesh; watertightness and manufacturing suitability are not guaranteed.</p><p id="meshError" role="alert"></p>`,async()=>{try{const file=document.getElementById('meshFile').files[0];if(!file)return false;if(current.id!==project)throw Error('The active project changed. Reopen import.');if(file.size>StudioMeshParts.MAX_BYTES)throw Error('Use a mesh file below 2 MiB.');const format=file.name.split('.').pop().toLowerCase(),mesh=StudioMeshParts.parse(await file.arrayBuffer(),format,{units:document.getElementById('meshUnits').value,up:document.getElementById('meshUp').value});await insertRecord({id:uid(),partId:'imported_mesh',name:file.name.slice(0,80)||'Imported mesh',dims:{scale:1},mesh,material:'Aluminium 6061',position:[0,0,0],rotation:[0,0,0],visible:true,wireframe:false});return true;}catch(e){document.getElementById('meshError').textContent=e.message;return false;}});
+    document.querySelector('#modalForm>button[type=submit]').textContent='Import mesh';
+  }
+
   /* ─── Selection & Picking ────────────────────────────────────── */
-  function select(id) {
+  function select(id,additive=false,individual=false) {
+    if(!additive)selectedIds.clear();
+    if(id){const group=individual?null:assemblyGroups.find(g=>g.members.includes(id));const ids=group?group.members:[id];const remove=additive&&ids.every(i=>selectedIds.has(i));ids.forEach(i=>remove?selectedIds.delete(i):selectedIds.add(i));}
     const target=objects.find(o=>o.id===id);if(target?.visible&&!target.obj3d.visible)setAssemblyStage(6,false);
     objects.forEach(o => o.obj3d.traverse(c => {
       if (c.isMesh && c.material?.emissive) c.material.emissive.setHex(0);
     }));
-    selId = id;
+    selId = selectedIds.has(id)?id:[...selectedIds].at(-1)||null;
     const rec = objects.find(o => o.id === id);
-    if (rec) {
-      rec.obj3d.traverse(c => {
+    if (selectedIds.size) {
+      objects.filter(o=>selectedIds.has(o.id)).forEach(o=>o.obj3d.traverse(c => {
         if (c.isMesh && c.material?.emissive) c.material.emissive.setHex(0x1e4e2a);
-      });
+      }));
       const badge = document.getElementById('v3dSel');
       if (badge) {
         badge.style.display = '';
-        document.getElementById('v3dSelName').textContent = rec.name;
+        document.getElementById('v3dSelName').textContent = selectedIds.size>1?selectedIds.size+' parts selected':rec?.name||'';
       }
     } else {
       const badge = document.getElementById('v3dSel');
@@ -675,16 +738,17 @@
     refreshAsm();
     renderInsp();
     syncTransformHandles();
+    renderAssemblyTools();
   }
   function syncTransformHandles(){
     if(!transformControls)return;
-    const rec=objects.find(o=>o.id===selId),active=['move','rotate'].includes(mode)&&!!rec?.obj3d.visible&&!exploded;
+    const rec=objects.find(o=>o.id===selId),locked=assemblyJoints.some(j=>selectedIds.has(j.child)&&!selectedIds.has(j.parent)),active=['move','rotate'].includes(mode)&&!!rec?.obj3d.visible&&!exploded&&!locked;
     transformControls.enabled=active;transformControls.setTranslationSnap(snapTransforms?0.1:null);transformControls.setRotationSnap(snapTransforms?Math.PI/12:null);
-    if(active){transformControls.setMode(mode==='move'?'translate':'rotate');transformControls.attach(rec.obj3d);}else transformControls.detach();
+    if(active){transformControls.setMode(mode==='move'?'translate':'rotate');if(selectedIds.size>1){if(!multiPivot){multiPivot=new window.THREE.Group();scene.add(multiPivot);}const centre=new window.THREE.Vector3();objects.filter(o=>selectedIds.has(o.id)).forEach(o=>centre.add(o.obj3d.position));multiPivot.position.copy(centre.divideScalar(selectedIds.size));multiPivot.quaternion.identity();multiPivot.updateMatrixWorld(true);transformControls.attach(multiPivot);}else transformControls.attach(rec.obj3d);}else transformControls.detach();
   }
 
   function pick(e) {
-    if(mode==='orbit'||transformControls?.dragging||['move','rotate'].includes(mode)&&transformControls?.axis||!raycaster||!camera)return;
+    if(!measureMode&&mode==='orbit'||transformControls?.dragging||['move','rotate'].includes(mode)&&transformControls?.axis||!raycaster||!camera)return;
     const canvas = document.getElementById('v3dCanvas');
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -698,13 +762,14 @@
     });
     const hits = raycaster.intersectObjects(meshes, false);
     if (hits.length) {
+      if(measureMode){measurePoints.push(hits[0].point.clone());if(measurePoints.length>2)measurePoints.shift();drawMeasurement();renderAssemblyTools();return;}
       const hit = hits[0].object;
       const rec = objects.find(o => {
         let match = false;
         o.obj3d.traverse(c => { if (c === hit) match = true; });
         return match;
       });
-      if (rec) { select(rec.id); return; }
+      if (rec) { select(rec.id,e.ctrlKey||e.metaKey||e.shiftKey,e.altKey); return; }
     }
     select(null);
   }
@@ -761,6 +826,7 @@
       </div>`;
     bindInsp(rec);
     document.getElementById('applyPos').disabled=exploded;document.getElementById('applyRot').disabled=exploded;
+    if(assemblyJoints.some(j=>j.child===rec.id)){document.getElementById('applyPos').disabled=true;document.getElementById('applyRot').disabled=true;}
   }
 
   function bindInsp(rec) {
@@ -833,7 +899,8 @@
       return;
     }
     const row=o=>`
-      <div class="asm-item${o.id === selId ? ' selected' : ''}" data-asm="${esc(o.id)}">
+      <div class="asm-item${selectedIds.has(o.id) ? ' selected' : ''}" data-asm="${esc(o.id)}">
+        <input type="checkbox" aria-label="Select ${esc(o.name)}" data-multi="${esc(o.id)}" ${selectedIds.has(o.id)?'checked':''}>
         ${icon(o.def.icon || 'shaft', 12)}
         <button type="button" class="asm-name" data-select-asm="${esc(o.id)}">${esc(o.name)}</button>
         <button class="asm-vis" aria-label="${o.visible?'Hide':'Show'} ${esc(o.name)}" data-vis="${esc(o.id)}">${o.visible ? '●' : '○'}</button>
@@ -844,12 +911,13 @@
         const rows=objects.filter(o=>StudioDrone.stage(o.id)===step);if(!rows.length)return '';
         return `<details class="asm-group" data-stage="${step}" ${(existing.length?open.has(step):step===2)?'open':''}><summary>${step?step+' · ':''}${name}<span>${rows.length}</span></summary>${rows.map(row).join('')}</details>`;
       }).join('');
-    }else el.innerHTML=objects.map(row).join('');
+    }else el.innerHTML=assemblyGroups.map(g=>`<details class="asm-group" open><summary>${esc(g.name)} · ${g.members.length}</summary>${objects.filter(o=>g.members.includes(o.id)).map(row).join('')}</details>`).join('')+objects.filter(o=>!assemblyGroups.some(g=>g.members.includes(o.id))).map(row).join('');
 
     el.querySelectorAll('[data-asm]').forEach(item => item.onclick = e => {
-      if (e.target.closest('[data-vis]')) return;
-      select(item.dataset.asm);
+      if (e.target.closest('[data-vis],[data-multi]')) return;
+      select(item.dataset.asm,e.ctrlKey||e.metaKey||e.shiftKey,e.altKey);
     });
+    el.querySelectorAll('[data-multi]').forEach(input=>input.onclick=e=>{e.stopPropagation();select(input.dataset.multi,true,true)});
 
     el.querySelectorAll('[data-vis]').forEach(btn => btn.onclick = () => {
       const r = objects.find(o => o.id === btn.dataset.vis);
@@ -901,6 +969,7 @@
 
   /* ─── Actions: Duplicate, Delete, Clear, Explode ─────────────── */
   function delSelected() {
+    if(selectedIds.size){try{assembledView();const ids=new Set(selectedIds),data=sceneData();data.objects=data.objects.filter(o=>!ids.has(o.id));data.groups=(data.groups||[]).map(g=>({...g,members:g.members.filter(id=>!ids.has(id))})).filter(g=>g.members.length>=2);data.joints=(data.joints||[]).filter(j=>!ids.has(j.parent)&&!ids.has(j.child));commitAssembly(data);_toast('Selected parts removed.');}catch(e){_toast(e.message);}return;}
     assembledView();
     const i = objects.findIndex(o => o.id === selId);
     if (i < 0) { _toast('Select an object first'); return; }
@@ -921,6 +990,7 @@
   }
 
   function dupSelected() {
+    if(selectedIds.size){try{assembledView();const data=sceneData(),copies=data.objects.filter(o=>selectedIds.has(o.id)),map=new Map(copies.map(o=>[o.id,uid()]));for(const o of copies)data.objects.push({...structuredClone(o),id:map.get(o.id),name:o.name.slice(0,73)+' (copy)',position:o.position.map((v,i)=>v+(i===0?15:0))});for(const g of [...data.groups||[]])if(g.members.every(id=>map.has(id)))(data.groups||=[]).push({...g,id:uid(),name:g.name.slice(0,73)+' (copy)',members:g.members.map(id=>map.get(id))});for(const j of [...data.joints||[]])if(map.has(j.parent)&&map.has(j.child))data.joints.push({...structuredClone(j),id:uid(),parent:map.get(j.parent),child:map.get(j.child)});commitAssembly(data,[...map.values()]);}catch(e){_toast(e.message);}return;}
     if(sceneBlocked||!editorReady)return _toast('Resolve the 3D loading error first.');
     if(objects.length>=200)return _toast('Assemblies support up to 200 parts.');
     assembledView();
@@ -982,6 +1052,7 @@
       });
     });
     objects = [];
+    assemblyGroups=[];assemblyJoints=[];selectedIds.clear();clearMeasurement();
     selId = null;
     select(null);
     updateEmpty();
@@ -1143,6 +1214,7 @@
   /* ─── Event Binding ──────────────────────────────────── */
   function bindEditor() {
     const on = (id, fn) => { const el = document.getElementById(id); if(el)el.onclick=fn; };
+    on('openMeshImport',openMeshImport);on('openPersonalParts',openPersonalParts);renderAssemblyTools();
     on('tb-model',()=>modelPart());on('startCustomSolid',()=>modelPart());on('tb-edit-model',()=>selId?modelPart(selId):_toast('Select a custom solid first.'));
     on('tb-move',()=>setMode('move'));on('tb-rotate',()=>setMode('rotate'));const snap=document.getElementById('tb-snap');if(snap)snap.onchange=e=>{snapTransforms=e.target.checked;syncTransformHandles()};
     const stage=document.getElementById('droneStage');if(stage)stage.onchange=e=>setAssemblyStage(Number(e.target.value));

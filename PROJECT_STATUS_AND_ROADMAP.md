@@ -2,6 +2,8 @@
 
 Reviewed on 23 October 2026 against the current source, prior executed checks, and deployment records. This report does not claim new test execution or production certification.
 
+For the ordered delivery checklist and explicit completed/partial/not-started states, see [PRIORITY_CHECKLIST.md](PRIORITY_CHECKLIST.md).
+
 ## Current position
 
 The product is a working engineering concept-workspace prototype. It has real local project workflows, a limited 3D assembly editor and selected engineering calculators. It now includes a first custom mesh solid modeller. It is not yet a complete CAD application or an operational paid cloud service.
@@ -18,7 +20,7 @@ The hosted static publication does not run the Python backend. Hosting access co
 
 - Landing, signup/login preview, dashboard, profile, pricing, upgrade, checkout simulation, confirmation, billing preview and Premium dashboard preview.
 - Project library with search, filters, sorting, pins, duplication and project exports.
-- Five starters: slider-crank, DC resistor, enclosure, actuator brief and quadcopter assembly.
+- Six starters: custom solid modelling, slider-crank, DC resistor, enclosure, actuator brief and quadcopter assembly.
 - Browser-local project storage, JSON import/export, device backups, recoverable Trash and restoration.
 - Edit undo/redo, saved revision snapshots, comparison and restoration.
 - Research/evidence notes and change-dependent staleness markers.
@@ -60,6 +62,12 @@ An adapter or deployment file is not evidence that its external service is runni
 
 The v9 update delivers closed polygon drawing/exact vertices, grid snapping, XZ/XY/YZ work planes, editable extrusion depth, cylindrical/box cutting tools, through-holes, pockets, union/intersection, editable/suppressible/reorderable feature history, preview volume/surface area, saved recipes, and mouse move/rotate handles with 1 mm / 15 degree snapping. Rebuilding runs in a dedicated worker with input, feature, triangle and time limits. A sixth starter demonstrates the workflow. See V9_MODELLING_REVIEW.md for validation and boundaries.
 
+## v10 workflow delivered
+
+See [V10_WORKSPACE_REVIEW.md](V10_WORKSPACE_REVIEW.md). The modeller now has multi-select checkboxes, saved groups, batch/shared-pivot transforms, reference alignment, world bounds and picked-point measurements; ASCII/binary STL and triangulated OBJ imports; a device-local personal parts library with separate JSON backup; basic polygon constraints and sampled Bézier edges; revolve, tapered/twisted extrusion, mirror and linear patterns; fixed/hinge/slider joints with parent-relative poses, limits and cycle rejection. The assembly tree is placed above the inspector tools for quick access.
+
+These are bounded mesh workflows. Curves are sampled vertices, constraints are a small projection system, groups are not nested subassemblies, and joints pose geometry without contact or force simulation. Imported parts have triangle/file/storage limits. Full CAD and cloud release gates below remain separate.
+
 ## Remaining 3D modelling work
 
 **Delivered first modelling milestone:**
@@ -67,20 +75,20 @@ The v9 update delivers closed polygon drawing/exact vertices, grid snapping, XZ/
 1. Closed polygon profiles and exact vertex editing, with invalid-profile feedback. Arcs and connected curve sketches remain future work.
 2. XZ/XY/YZ work-plane selection. Selecting arbitrary faces/planes remains future work.
 3. Extrusion with user-entered depth and direction; edit the originating sketch and regenerate the result.
-4. Holes, pockets and solid union/subtraction/intersection.
-5. Mouse move/rotate handles and snapping. Alignment, multi-selection and grouping remain future work.
+4. Holes, pockets and solid union/subtraction/intersection within a custom part using box/cylinder tools. Boolean operations between arbitrary assembly parts remain future work.
+5. Mouse move/rotate handles and snapping. Multi-selection, grouping, alignment and shared-pivot transforms were added in v10.
 6. A dependable feature/operation history whose edits rebuild later geometry.
 7. Tests and recovery for invalid geometry, failed operations and saved-model compatibility.
 
-**More advanced CAD scope:** revolve, sweep, loft, fillet, chamfer, shell, mirror/pattern, constrained sketches, assembly mates/joints, collision/clearance checks, measurement tools, physical materials, volume/mass/centre of mass and tolerances.
+**More advanced CAD scope:** general sweep/loft, fillet/chamfer/shell, analytic curved profiles, a general constraint solver, arbitrary face work planes, richer mates/nested subassemblies, exact collision/clearance, physical materials, mass/centre of mass and tolerances. Basic revolve, taper/twist, mirror/linear patterns, polygon constraints, fixed/hinge/slider joints and geometric measurements are delivered in v10. Geometric volume and surface area already appear in the custom-solid preview.
 
-A browser-friendly modelling-kernel strategy must be selected and validated before promising robust CAD operations or exact CAD interchange. Mesh modelling and exact solid modelling have different capabilities. A full professional CAD replacement is a much larger scope than the first modelling milestone.
+Manifold is already integrated and tested for the bounded custom mesh-modelling workflow. An exact-solid/BREP strategy still needs selection and validation before promising exact CAD interchange. Mesh modelling and exact solid modelling have different capabilities. A full professional CAD replacement is a much larger scope than the first modelling milestone.
 
 ## Remaining component/library work
 
-- Reliable custom mesh import, file/geometry limits, orientation/units handling and saved imported assets.
+- Broader mesh-format support, mesh diagnostics/repair and larger-asset handling beyond the delivered bounded STL/triangulated-OBJ importer.
 - Manufacturer-specific parts with source, licensing, dimensions and revision metadata.
-- Searchable/user-owned parts, reusable subassemblies and editable component variants.
+- Richer search and metadata for the delivered personal parts library; nested reusable subassemblies and editable manufacturer-specific variants.
 - Broader export/import compatibility, including a validated path for STEP/BREP if exact modelling is adopted.
 - Mesh diagnostics/repair and external slicer/CAD acceptance tests.
 - Performance work for larger assemblies; lifting the 200-object cap safely needs benchmarks and memory/rendering strategies.
@@ -127,14 +135,14 @@ FEA, PCB design, flight simulation and general circuit simulation are separate m
 
 ## Evidence and limits
 
-The latest executed checks passed 66 API tests and the JavaScript calculation, template, recovery, save-flow and 3D geometry suites. Interactive browser checks covered creating the drone, stage controls, views, dimensions, undo, selected-project reload and saving a revision. The last reviewed geometry suite covered all 32 catalogue entries, motor screw/arm hole alignment, propeller-envelope separation, preview isolation, export and BOM behavior.
+The latest v10 checks passed 92 API tests, all JavaScript suites and the full 32-case desktop/phone browser suite. Interactive browser checks covered creating the drone, stage controls, views, dimensions, undo, selected-project reload and saving a revision. The last reviewed geometry suite covered all 32 catalogue entries, motor screw/arm hole alignment, propeller-envelope separation, preview isolation, export and BOM behavior.
 
-Provider calls in tests were mocked or synthetic. PostgreSQL/container/TLS production behavior, live payments/email/OAuth/AI, restore exercises, the standalone browser runner and remote CI were not established as passing by those results. Dependency audit records are historical snapshots, not ongoing guarantees.
+Provider calls in tests were mocked or synthetic. PostgreSQL/container/TLS production behavior, live payments/email/OAuth/AI, restore exercises and remote CI were not established as passing by those results. The standalone browser runner now passes locally. Dependency audit records are historical snapshots, not ongoing guarantees.
 
 ## Recommended sequence and release gates
 
 1. **First modelling alpha delivered:** sketch profile → extrude → hole/cut/union → edit → save/reload → export. Test complete user projects rather than only preset assembly.
-2. **Usable CAD workflow:** transform handles/snapping, geometry history, measurement, reusable/imported parts and dependable export. Expand advanced operations selectively.
+2. **Usable CAD workflow, first extension delivered:** v10 adds measurements, multi-selection/grouping/alignment, reusable/imported parts, basic constraints, advanced mesh operations and joints. Continue with richer sketch/CAD tools and external export acceptance.
 3. **Private cloud beta:** deploy/test accounts, PostgreSQL project storage, email, provider integrations, backups and monitoring. Existing backend code reduces the implementation work but does not replace staging acceptance.
 4. **Paid release:** approved premium scope and pricing, server-enforced entitlements, actual payment lifecycle verification, release QA and operating/support policies.
 5. **Advanced engineering platform:** validated simulation, richer electronics, AI modelling and collaboration in separately scoped increments.

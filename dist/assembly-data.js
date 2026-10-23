@@ -54,6 +54,7 @@ const StudioAssembly=(()=>{
   const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
   const finite=v=>typeof v==='number'&&Number.isFinite(v);
   function dimensions(id,d){
+    if(id==='imported_mesh')return object(d)&&Object.keys(d).join(',')==='scale'&&finite(d.scale)&&d.scale>=.1&&d.scale<=20;
     const p=parts.find(p=>p.id===id);if(!p||!object(d))return false;
     if(Object.keys(d).length!==Object.keys(p.dims).length||Object.keys(p.dims).some(k=>!finite(d[k])||d[k]<0.1||d[k]>5000))return false;
     if('teeth' in d&&(!Number.isInteger(d.teeth)||d.teeth<6||d.teeth>120))return false;
@@ -67,14 +68,23 @@ const StudioAssembly=(()=>{
     return true;
   }
   function validate(a){
-    if(!object(a)||a.version!==1||a.units!=='mm'||Object.keys(a).some(k=>!['version','units','objects'].includes(k))||!Array.isArray(a.objects)||a.objects.length>200)return false;
+    if(!object(a)||a.version!==1||a.units!=='mm'||Object.keys(a).some(k=>!['version','units','objects','groups','joints'].includes(k))||!Array.isArray(a.objects)||a.objects.length>200)return false;
     const ids=new Set();
-    return a.objects.every(o=>{
-      if(!object(o)||Object.keys(o).some(k=>!['id','partId','name','dims','material','position','rotation','visible','wireframe','model'].includes(k))||typeof o.id!=='string'||!/^[a-zA-Z0-9_-]{1,80}$/.test(o.id)||ids.has(o.id))return false;
+    let triangles=0;
+    const validObjects=a.objects.every(o=>{
+      if(!object(o)||Object.keys(o).some(k=>!['id','partId','name','dims','material','position','rotation','visible','wireframe','model','mesh'].includes(k))||typeof o.id!=='string'||!/^[a-zA-Z0-9_-]{1,80}$/.test(o.id)||ids.has(o.id))return false;
       if(o.partId==='custom_solid'?!StudioSolidModel.validate(o.model,o.dims?.depth):o.model!==undefined)return false;
+      if(o.partId==='imported_mesh'){if(!StudioMeshParts.validate(o.mesh))return false;triangles+=o.mesh.positions.length/9;}else if(o.mesh!==undefined)return false;
       ids.add(o.id);
       return typeof o.name==='string'&&o.name.length>0&&o.name.length<=80&&materials.includes(o.material)&&dimensions(o.partId,o.dims)&&typeof o.visible==='boolean'&&typeof o.wireframe==='boolean'&&Array.isArray(o.position)&&o.position.length===3&&o.position.every(v=>finite(v)&&Math.abs(v)<=100000)&&Array.isArray(o.rotation)&&o.rotation.length===3&&o.rotation.every(v=>finite(v)&&Math.abs(v)<=3600);
     });
+    if(!validObjects||triangles>12000)return false;
+    const groupIds=new Set(),members=new Set();
+    if(a.groups!==undefined&&(!Array.isArray(a.groups)||a.groups.length>100||a.groups.some(g=>!object(g)||Object.keys(g).sort().join(',')!=='id,members,name'||typeof g.id!=='string'||!/^[a-zA-Z0-9_-]{1,80}$/.test(g.id)||groupIds.has(g.id)||!groupIds.add(g.id)||typeof g.name!=='string'||!g.name.trim()||g.name.length>80||!Array.isArray(g.members)||g.members.length<2||g.members.length>200||g.members.some(id=>!ids.has(id)||members.has(id)||!members.add(id)))))return false;
+    const jointIds=new Set(),parents=new Map();
+    if(a.joints!==undefined&&(!Array.isArray(a.joints)||a.joints.length>199||a.joints.some(j=>{if(!object(j)||Object.keys(j).sort().join(',')!=='axis,child,id,max,min,offset,orientation,parent,type,value'||typeof j.id!=='string'||!/^[a-zA-Z0-9_-]{1,80}$/.test(j.id)||jointIds.has(j.id)||!ids.has(j.parent)||!ids.has(j.child)||j.parent===j.child||parents.has(j.child)||!['fixed','hinge','slider'].includes(j.type)||!['X','Y','Z'].includes(j.axis)||!['offset','orientation'].every(k=>Array.isArray(j[k])&&j[k].length===3&&j[k].every(v=>finite(v)&&Math.abs(v)<=(k==='offset'?100000:3600)))||!['value','min','max'].every(k=>finite(j[k])&&Math.abs(j[k])<=(j.type==='slider'?100000:360))||j.min>j.max||j.value<j.min||j.value>j.max||j.type==='fixed'&&[j.value,j.min,j.max].some(v=>v!==0))return true;jointIds.add(j.id);parents.set(j.child,j.parent);return false;})))return false;
+    for(const child of parents.keys()){const seen=new Set([child]);let node=parents.get(child);while(node){if(seen.has(node))return false;seen.add(node);node=parents.get(node);}}
+    return true;
   }
   function legacy(rows){
     if(!Array.isArray(rows))throw Error('Invalid legacy 3D scene');
@@ -90,9 +100,9 @@ const StudioAssembly=(()=>{
     const groups=new Map();
     for(const o of a.objects){
       const dims=Object.fromEntries(Object.entries(o.dims).sort(([a],[b])=>a.localeCompare(b)));
-      const key=JSON.stringify(o.model?[o.partId,o.material,dims,StudioSolidModel.signature(o.model)]:[o.partId,o.material,dims]);
+      const key=JSON.stringify(o.model?[o.partId,o.material,dims,StudioSolidModel.signature(o.model)]:o.mesh?[o.partId,o.material,dims,StudioMeshParts.signature(o.mesh)]:[o.partId,o.material,dims]);
       const previous=existing.find(p=>p.source3dKey===key);
-      if(!groups.has(key))groups.set(key,{name:((o.model?o.name:parts.find(p=>p.id===o.partId).name)+' · '+Object.entries(dims).map(([k,v])=>k+' '+Number(v.toFixed(3))).join(' / ')).slice(0,200),material:o.material,qty:0,price:previous?.price||0,source3dKey:key});
+      if(!groups.has(key))groups.set(key,{name:((o.model||o.mesh?o.name:parts.find(p=>p.id===o.partId).name)+' · '+Object.entries(dims).map(([k,v])=>k+' '+Number(v.toFixed(3))).join(' / ')).slice(0,200),material:o.material,qty:0,price:previous?.price||0,source3dKey:key});
       groups.get(key).qty++;
     }
     return [...existing.filter(p=>!p.source3dKey),...groups.values()];

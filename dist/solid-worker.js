@@ -1,6 +1,6 @@
 /* Only this DOM-free worker permits the vendored engine's generated bindings.
    Recipes are data, never executable strings. Main-page JavaScript eval stays blocked. */
-importScripts('./solid-model.js');
+importScripts('./sketch-constraints.js','./solid-model.js');
 StudioSolidModel.initKernel().then(()=>postMessage({ready:true})).catch(e=>postMessage({bootError:e.message}));
 onmessage=e=>{
   const {id,model,depth}=e.data;

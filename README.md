@@ -2,6 +2,8 @@
 
 Browser-local engineering concept workspace. Serve `dist/` using any static HTTP server.
 
+Current workspace tools v10: [V10_WORKSPACE_REVIEW.md](V10_WORKSPACE_REVIEW.md). Multi-select/groups, alignment, measurements, STL/OBJ import, personal reusable parts, basic sketch constraints and sampled curves, revolve/taper/twist/mirror/pattern, and fixed/hinge/slider joints. Run `npm test` and `npm run test:e2e`; on a local machine with installed Chrome, set `STUDIO_BROWSER_CHANNEL=chrome` if Playwright Chromium is unavailable. The browser suite uses `node scripts/preview.cjs` on port 4177.
+
 Custom solid modelling v9: [V9_MODELLING_REVIEW.md](V9_MODELLING_REVIEW.md). Draw closed profiles, extrude, cut holes/pockets, join/intersect features, and save editable modelling history. The editor uses a dedicated Manifold JS/WASM worker. Move/Rotate handles provide optional snapping. Open the Custom solid modelling starter or choose Draw your own 3D part in the 3D editor.
 
 Latest reliability and UI changes: [QUALITY_REVIEW.md](QUALITY_REVIEW.md). Run `npm test` for all JavaScript regressions. Site visibility is managed separately by the owner.
@@ -20,7 +22,7 @@ Latest reliability and UI changes: [QUALITY_REVIEW.md](QUALITY_REVIEW.md). Run `
 - Fabrication checklist, batch planning costs and standalone HTML project report.
 - Quick-action palette, keyboard shortcut and responsive layouts.
 
-Data remains in this browser's localStorage; export project JSON for backup or migration. Hosted access is owner-private. No cloud project synchronization, live AI, CAD kernel, finite-element solver or fabrication certification is included.
+Data remains in this browser's localStorage; export project JSON for backup or migration. The existing hosted audience is preserved. The current custom modeller uses a Manifold mesh kernel; cloud project synchronization, live AI, exact BREP CAD, finite-element simulation and fabrication certification are not provided by the static publication.
 
 ## Checks
 

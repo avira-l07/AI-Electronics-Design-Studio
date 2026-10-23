@@ -1,3 +1,5 @@
+v10 follow-up, 23 October 2026: **92 API tests passed**. Added imported-mesh/group/joint project and snapshot round-trip plus malformed asset, graph, constraint and modifier rejection. All JavaScript suites and 32 local desktop/phone browser tests passed. Remote CI and real production services remain separate. See `../V10_WORKSPACE_REVIEW.md`.
+
 Custom modelling follow-up: **66 API tests passed** on 23 October 2026. See `../V9_MODELLING_REVIEW.md` for the current scope and verification boundaries.
 
 # Validation record — 22 October 2026

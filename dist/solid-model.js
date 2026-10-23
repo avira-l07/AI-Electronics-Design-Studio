@@ -29,7 +29,11 @@ const StudioSolidModel=(()=>{
     return exact(f.dims,keys)&&Object.values(f.dims).every(v=>number(v)&&v>=.1)&&(!f.through||f.operation==='subtract'&&f.rotation[0]===0&&f.rotation[1]===0);
   }
   function validate(m,depth){
-    if(!exact(m,['version','plane','outline','features'])||m.version!==1||!['XZ','XY','YZ'].includes(m.plane)||!number(depth)||depth<.1||profileError(m.outline)||!Array.isArray(m.features)||m.features.length>16)return false;
+    if(!obj(m)||!['version','plane','outline','features'].every(k=>Object.hasOwn(m,k))||Object.keys(m).some(k=>!['version','plane','outline','features','base','constraints','modifiers'].includes(k))||m.version!==1||!['XZ','XY','YZ'].includes(m.plane)||!number(depth)||depth<.1||profileError(m.outline)||!Array.isArray(m.features)||m.features.length>16)return false;
+    if(m.constraints!==undefined&&(!StudioSketch.valid(m.constraints,m.outline.length)||m.constraints.some(c=>StudioSketch.residual(m.outline,c)>.005)))return false;
+    if(m.base!==undefined&&(!exact(m.base,['type','angle','twist','scale'])||!['extrude','revolve'].includes(m.base.type)||!number(m.base.angle,360)||m.base.angle<1||!number(m.base.twist,360)||!number(m.base.scale,4)||m.base.scale<.1||m.base.type==='revolve'&&m.outline.some(p=>p[0]<0)))return false;
+    if(m.modifiers!==undefined&&(!Array.isArray(m.modifiers)||m.modifiers.length>4||m.modifiers.some(f=>f?.type==='mirror'?!exact(f,['type','axis'])||!['U','V','W'].includes(f.axis):f?.type==='pattern'?!exact(f,['type','count','step'])||!Number.isInteger(f.count)||f.count<2||f.count>8||!vector(f.step)||Math.hypot(...f.step)<.1:true)))return false;
+    if((m.modifiers||[]).reduce((n,f)=>n*(f.type==='pattern'?f.count:1),1)>32||m.base?.type==='revolve'&&m.features.some(f=>f.through))return false;
     const ids=new Set();return m.features.every(f=>featureValid(f)&&!ids.has(f.id)&&!!ids.add(f.id));
   }
   function defaultModel(){return {version:1,plane:'XZ',outline:[[-40,-25],[40,-25],[40,25],[-40,25]],features:[]};}
@@ -68,18 +72,20 @@ const StudioSolidModel=(()=>{
     const allocated=[],keep=o=>{allocated.push(o);return o;};
     try{
       const section=keep(new kernel.CrossSection([model.outline.map(([x,y])=>({x,y}))],'NonZero'));
-      let solid=keep(section.extrude(depth));
+      const base=model.base||{type:'extrude',twist:0,scale:1};
+      let solid=keep(base.type==='revolve'?section.revolve(96,base.angle):section.extrude(depth,base.twist?32:0,base.twist,{x:base.scale,y:base.scale}));
       for(const f of model.features){
         if(!f.enabled)continue;
         const h=f.through?depth+.2:f.dims.depth;
         let tool;
         if(f.shape==='cylinder')tool=keep(kernel.Manifold.cylinder(h,f.dims.diameter/2,f.dims.diameter/2,48));
         else{tool=keep(kernel.Manifold.cube({x:f.dims.width,y:f.dims.height,z:h}));tool=keep(tool.translate({x:-f.dims.width/2,y:-f.dims.height/2,z:0}));}
-        tool=keep(tool.rotate(f.rotation));tool=keep(tool.translate({x:f.position[0],y:f.position[1],z:f.through?-.1:f.position[2]}));
+        tool=keep(tool.rotate(...f.rotation));tool=keep(tool.translate({x:f.position[0],y:f.position[1],z:f.through?-.1:f.position[2]}));
         solid=keep(f.operation==='union'?solid.add(tool):f.operation==='subtract'?solid.subtract(tool):solid.intersect(tool));
         if(solid.status()!=='NoError'||solid.isEmpty())throw Error('Feature “'+f.name+'” leaves an empty or invalid solid. Adjust its size or position.');
       }
       if(solid.status()!=='NoError'||solid.isEmpty())throw Error('The profile did not produce a solid.');
+      for(const modifier of model.modifiers||[]){if(modifier.type==='mirror'){const normal=[0,0,0];normal['UVW'.indexOf(modifier.axis)]=1;solid=keep(solid.mirror({x:normal[0],y:normal[1],z:normal[2]}));}else{const original=solid;for(let i=1;i<modifier.count;i++){const copy=keep(original.translate({x:modifier.step[0]*i,y:modifier.step[1]*i,z:modifier.step[2]*i}));solid=keep(solid.add(copy));}}if(solid.status()!=='NoError'||solid.isEmpty())throw Error('The modifier leaves an invalid solid.');}
       const mesh=solid.getMesh(),volume=solid.volume(),area=solid.surfaceArea();
       if(!Number.isFinite(volume)||volume<=0||mesh.triVerts.length>300000)throw Error('The resulting model is empty or exceeds the geometry limit.');
       const positions=new Float32Array(mesh.numVert*3);
