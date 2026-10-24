@@ -33,6 +33,23 @@ def limit(db,key,maximum=15,seconds=900):
     count=db.execute(statement).scalar_one()
     if count>maximum:
         db.commit();fail(429,'Too many attempts. Try again later.')
+
+def recipient_limit(db,email):
+    """Three invitations in any rolling day, including canceled invitations.
+
+    Three durable slots per hashed recipient avoid unbounded event rows. Each
+    slot is claimed atomically; PostgreSQL rechecks the conflict condition
+    after waiting for a concurrent sender. Call before invitation mutations.
+    """
+    if db.bind.dialect.name=='postgresql':from sqlalchemy.dialects.postgresql import insert
+    else:from sqlalchemy.dialects.sqlite import insert
+    stamp=now();key='invite-recipient:'+digest(email)
+    for slot in range(3):
+        ident=key+':'+str(slot)
+        statement=insert(Rate).values(id=ident,count=1,expires=stamp+86400)
+        statement=statement.on_conflict_do_update(index_elements=['id'],set_={'count':1,'expires':stamp+86400},where=Rate.expires<=stamp).returning(Rate.id)
+        if db.execute(statement).scalar_one_or_none():return
+    fail(429,'Invitation delivery is temporarily limited. Try again later.')
 def access_token(settings,user,session):
     return jwt.encode({'sub':user.id,'sid':session.id,'ver':user.epoch,'iat':now(),'exp':now()+300,'iss':settings.origin,'aud':'engineering-studio'},settings.jwt_key,algorithm='HS256')
 def decode(settings,token,expired=False):

@@ -1,5 +1,7 @@
 # Secure API and frontend integration
 
+Latest v15.5: [verified security audit](SECURITY_AUDIT_2026-10-25.md). Anonymous share limits run before database access; recipient quotas permit three invitations per rolling 24 hours across senders. Replay revokes the affected refresh family and alerts once. Stripe endpoints must deliver pinned **2024-06-20 snapshot events**; mismatched versions/invoice schemas fail without ledger acknowledgement. No new migration is required; apply the existing 0005 migrations. These backend fixes require backend deployment; static Sites publication alone does not activate them.
+
 Current v15.3: [free beta delivery](../FREE_BETA_DELIVERY.md). Free cloud preparation is authorized; provider account access is still required. Includes Resend HTTPS/request-triggered outbox, complimentary Pro, consistent account/token locks and optional loopback Ollama modelling. Default beta startup disables AI and billing; the local demo explicitly opts into the installed local model using `--local-ai`.
 
 Follow-up v15.2: [residual-risk review](RESIDUAL_RISK_REVIEW.md). Sign-in confirmations default to 20 minutes; configure `LOGIN_CONFIRMATION_TTL_SECONDS` within 600–1800 seconds. Delivery and provider activation remain unverified until deployment.

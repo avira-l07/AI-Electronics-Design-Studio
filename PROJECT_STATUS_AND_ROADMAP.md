@@ -1,5 +1,7 @@
 # Engineering Studio — status and remaining work
 
+Latest v15.5: [security audit and remediation](api/SECURITY_AUDIT_2026-10-25.md) distinguishes confirmed gaps from existing defenses and optional policies. Snapshot/invitation abuse limits, export validation, background manufacturing checks, replay notices and billing version/schema protection are implemented and locally verified. Full suites: 186 API tests; 132 browser checks passed, two expected skips. Frontend publication does not deploy the backend. Cloud, provider and manufacturing acceptance below remain outstanding.
+
 Latest v15.4: [user-perspective audit](UX_AUDIT_2026-10-24.md) reviews all supplied UX findings and delivers the confirmed fixes. Public resource browsing does not expose account projects; unapplied form drafts do not silently save. The v15.3 free-beta architecture and outstanding cloud/manufacturing/CAD limits remain below.
 
 Current follow-up v15.3: [zero-cost beta delivery](FREE_BETA_DELIVERY.md). The owner has authorized a free-tier beta, with paid services/live charges still disabled. Account/token lock ordering and the custom-assembly cache lifecycle are corrected in source. A synthetic loopback demo is runnable now. Render Free/Neon preparation is provided; actual cloud/provider acceptance remains blocked by missing access/configuration. The v15.2 review below is historical context.

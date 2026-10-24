@@ -6,11 +6,13 @@ from api.models import User, Subscription, Payment, Webhook, now
 from api.security import notify, audit, fail
 from api.money import format_minor
 
+STRIPE_API_VERSION='2024-06-20'
+
 class StripeGateway:
     def __init__(self,settings):self.s=settings
     def options(self):
         if not self.s.stripe_key:fail(503,'Stripe is not configured')
-        return {'api_key':self.s.stripe_key,'stripe_version':'2024-06-20'}
+        return {'api_key':self.s.stripe_key,'stripe_version':STRIPE_API_VERSION}
     def customer(self,user):return stripe.Customer.create(email=user.email,metadata={'user_id':user.id},idempotency_key='customer-'+user.id,**self.options())['id']
     def checkout(self,user,price,period,key):
         options={'customer':user.customer,'mode':'subscription','line_items':[{'price':price,'quantity':1}],'success_url':self.s.origin+'/#/confirmation','cancel_url':self.s.origin+'/#/upgrade','client_reference_id':user.id,'allow_promotion_codes':True}
@@ -28,10 +30,25 @@ class StripeGateway:
     def portal(self,customer):return stripe.billing_portal.Session.create(customer=customer,return_url=self.s.origin+'/#/billing',**self.options())['url']
     def verify_event(self,raw,signature):
         if not self.s.webhook_key:fail(503,'Webhook verification is not configured')
-        try:return stripe.Webhook.construct_event(raw,signature,self.s.webhook_key,tolerance=300).to_dict()
+        try:event=stripe.Webhook.construct_event(raw,signature,self.s.webhook_key,tolerance=300).to_dict()
         except (ValueError,stripe.error.SignatureVerificationError):fail(400,'Invalid webhook signature')
+        # Endpoint event versions are independent of API request versions.
+        # Reject drift before recording an event as processed.
+        if event.get('api_version')!=STRIPE_API_VERSION:fail(400,'Webhook API version mismatch; configure the pinned endpoint version')
+        data=event.get('data')
+        if not isinstance(event.get('id'),str) or not isinstance(event.get('type'),str) or not isinstance(data,dict) or not isinstance(data.get('object'),dict):fail(400,'Invalid webhook event')
+        return event
 
 def object_id(value):return value.get('id') if isinstance(value,dict) else value
+def invoice_subscription(invoice):
+    """Validate the authoritative pinned invoice before changing any ledger."""
+    if not isinstance(invoice,dict) or 'subscription' not in invoice:fail(502,'Unexpected provider invoice schema; event was not processed')
+    subscription=object_id(invoice['subscription'])
+    if subscription is not None and (not isinstance(subscription,str) or not subscription.startswith('sub_')):fail(502,'Invalid provider subscription reference')
+    if any(not isinstance(invoice.get(k),str) or not invoice[k] for k in ['id','status','currency']):fail(502,'Incomplete provider invoice')
+    if not isinstance(object_id(invoice.get('customer')),str):fail(502,'Incomplete provider invoice customer')
+    if any(type(invoice.get(k)) is not int or invoice[k]<0 for k in ['amount_paid','created']):fail(502,'Invalid provider invoice amounts or timestamp')
+    return subscription
 def sync_subscription(db,settings,gateway,user,subscription_id):
     # Called only while the account row is locked: serializes concurrent webhook deliveries.
     obj=gateway.subscription(subscription_id)
@@ -60,13 +77,13 @@ def process_event(db,settings,gateway,event):
         subscription_id=None;invoice=None
         if kind.startswith('customer.subscription.'):subscription_id=obj['id']
         elif kind.startswith('invoice.'):
-            invoice=gateway.invoice(obj['id']);subscription_id=object_id(invoice.get('subscription'))
+            invoice=gateway.invoice(obj['id']);subscription_id=invoice_subscription(invoice)
         elif kind.startswith('checkout.session.'):
             subscription_id=object_id(obj.get('subscription'))
         elif kind in ['charge.refunded','charge.dispute.created']:
             charge=gateway.charge(obj['id'] if kind=='charge.refunded' else object_id(obj['charge']))
             if charge.get('invoice'):
-                invoice=gateway.invoice(object_id(charge['invoice']));subscription_id=object_id(invoice.get('subscription'))
+                invoice=gateway.invoice(object_id(charge['invoice']));subscription_id=invoice_subscription(invoice)
         sub=None
         if subscription_id:sub,_=sync_subscription(db,settings,gateway,user,subscription_id)
         if invoice:

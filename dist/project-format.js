@@ -45,7 +45,18 @@ const StudioProjectData = (() => {
     if (/^[\s\u0000-\u001f]*[=+@-]/.test(s) || /^[\t\r\n]/.test(s)) s = "'" + s;
     return '"' + s.replaceAll('"','""') + '"';
   }
-  return {validate,parse,csvCell};
+  function downloadFilename(value) {
+    // Browser download hints are not filesystem paths. Still remove ambiguous
+    // separators, control/bidi characters and Windows reserved basenames.
+    let s=String(value ?? '').normalize('NFC').replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').replace(/[<>:"/\\|?*]/g,'_').replace(/^[. ]+|[. ]+$/g,'');
+    if(!s)s='export';
+    if(/^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\.|$)/i.test(s))s='_'+s;
+    const extension=s.match(/\.[a-z0-9]{1,12}$/i)?.[0] || '',base=extension?s.slice(0,-extension.length):s;
+    let short='',bytes=extension.length;
+    for(const char of base){const size=new TextEncoder().encode(char).length;if(bytes+size>180)break;short+=char;bytes+=size;}
+    return (short.replace(/[. ]+$/g,'') || 'export')+extension;
+  }
+  return {validate,parse,csvCell,downloadFilename};
 })();
 
 const studioStorage = {

@@ -2,6 +2,8 @@
 
 ## Current follow-up
 
+Latest v15.5: [25 October submitted-audit review](SECURITY_AUDIT_2026-10-25.md). Includes verified fixes, per-finding verdicts, 186 passing API tests and 132 passing browser checks with two expected skips. Backend rollout and real-provider/PostgreSQL acceptance remain outstanding.
+
 The latest [residual-risk review](RESIDUAL_RISK_REVIEW.md) covers v15.2 resource recovery, local privacy controls, public-file guards and configurable login-link expiry.
 
 See [the submitted threat-report audit](THREAT_REPORT_AUDIT.md) for the v15.1 fixes and current verification. Historical test counts below describe the original milestone.

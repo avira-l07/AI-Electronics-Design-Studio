@@ -5,7 +5,7 @@ from pydantic import BaseModel,ConfigDict,EmailStr,Field
 from sqlalchemy import select,func,delete
 from api.models import Project,ProjectMember,ProjectInvitation,ProjectComment,ProjectPresence,Session,User,now
 from api.assembly_data import validate_assembly
-from api.security import require_profile,fail,limit,audit,effective_plan
+from api.security import require_profile,fail,limit,audit,effective_plan,recipient_limit
 from api.product import require_feature
 from api.project_data import project_data
 
@@ -136,6 +136,7 @@ def install_collaboration(app,auth,db_session):
             count=db.scalar(select(func.count()).select_from(ProjectMember).where(ProjectMember.project_id==id,ProjectMember.accepted==True))
             count+=db.scalar(select(func.count()).select_from(ProjectInvitation).where(ProjectInvitation.project_id==id,ProjectInvitation.expires>now()))
             if (not invitation or invitation.expires<=now()) and count>=10:fail(409,'This project supports ten collaborators or pending invitations.')
+            recipient_limit(db,email)
             if not invitation:db.add(ProjectInvitation(project_id=id,email=email,role=body.role,expires=now()+7*86400))
             else:invitation.role=body.role;invitation.expires=now()+7*86400
         audit(db,who[0],'team.invitation.created');return {'status':'Invitation saved for this email. The recipient must verify their account and accept in-app. No email was sent.'}

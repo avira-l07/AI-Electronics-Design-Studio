@@ -1,5 +1,7 @@
 # Engineering Studio — current delivery checklist
 
+Latest v15.5: [submitted security audit](api/SECURITY_AUDIT_2026-10-25.md). Confirmed gaps fixed: pre-database snapshot limits, persistent rolling recipient quotas, export validation, background manufacturing review, replay alerts and Stripe schema/version drift. 186 API tests and 132 desktop/phone browser checks passed, with two expected browser skips; all 12 JavaScript suites and the 49-asset guard passed. Backend source fixes are not live until deployment. No paid services were activated.
+
 Latest v15.4: [verified UX audit](UX_AUDIT_2026-10-24.md). Fixes command actions, fractional prices, unapplied form retention, public template/guide browsing, 3D scrolling, table headers, circuit contrast, inspector stacking, export feedback and empty BOM guidance. Account project routes remain protected; deeper CAD and cloud dependencies below remain outstanding.
 
 Latest v15.3: [free-beta delivery and outstanding items](FREE_BETA_DELIVERY.md). Delivered: account-first token locks, incremental custom-solid loading, HTTPS outbox adapter, opt-in request-triggered delivery, expiring complimentary Pro and a one-command local synthetic demo. Free cloud deployment is authorized but not yet configured; no paid service or live billing is enabled.

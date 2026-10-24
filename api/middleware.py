@@ -1,5 +1,30 @@
 from fastapi.responses import JSONResponse
 from threading import BoundedSemaphore
+from time import monotonic
+import hashlib, hmac
+
+class PublicShareLimit:
+    """Bound anonymous snapshot traffic before opening a database transaction.
+
+    A fixed one-minute window, 60 per client and 1,200 total per process.
+    The global cap also bounds the number of keys. The free host uses one
+    worker; multiple workers need a shared edge limiter as well.
+    """
+    def __init__(self,app,key):
+        self.app=app;self.key=key.encode();self.window=-1;self.total=0;self.clients={}
+    async def __call__(self,scope,receive,send):
+        if scope['type']!='http' or scope['path']!='/api/shared' or scope['method']!='GET':
+            return await self.app(scope,receive,send)
+        # No await between reading and updating state: atomic on the ASGI loop.
+        moment=monotonic();window=int(moment//60)
+        if window!=self.window:self.window=window;self.total=0;self.clients.clear()
+        client=(scope.get('client') or ('unknown',0))[0]
+        ident=hmac.new(self.key,client.encode(),hashlib.sha256).digest()
+        self.total+=1
+        if self.total<=1200:self.clients[ident]=self.clients.get(ident,0)+1
+        if self.total>1200 or self.clients[ident]>60:
+            return await JSONResponse({'detail':'Too many snapshot requests. Try again shortly.'},429,headers={'Retry-After':str(max(1,60-int(moment%60)))})(scope,receive,send)
+        return await self.app(scope,receive,send)
 
 class FreeBetaCapacity:
     """Limit simultaneous mutating handlers on the small single-process beta.

@@ -15,7 +15,7 @@ from api.models import *
 from api.security import *
 from api.billing import StripeGateway, process_event, sync_subscription
 from api.project_data import project_data
-from api.middleware import BodyLimitMiddleware
+from api.middleware import BodyLimitMiddleware, PublicShareLimit
 from api.static_files import PublicFrontend
 
 class Input(BaseModel):model_config=ConfigDict(extra='forbid')
@@ -54,6 +54,7 @@ def create_app(settings=None,gateway=None):
     from urllib.parse import urlparse
     app.add_middleware(TrustedHostMiddleware,allowed_hosts=[urlparse(s.origin).hostname,'testserver'] if s.environment=='test' else [urlparse(s.origin).hostname])
     app.add_middleware(BodyLimitMiddleware)
+    app.add_middleware(PublicShareLimit,key=s.jwt_key)
 
     @app.middleware('http')
     async def hardening(request,call_next):
@@ -77,6 +78,11 @@ def create_app(settings=None,gateway=None):
                     limit(guard,ip_hash(s,request)+scope,cap);guard.commit()
             try:await run_in_threadpool(enforce_request_limit)
             except HTTPException as e:return JSONResponse({'detail':e.detail},e.status_code)
+        return await call_next(request)
+
+    @app.middleware('http')
+    async def security_headers(request,call_next):
+        # Outermost middleware: rejection responses need these headers too.
         response=await call_next(request)
         response.headers['X-Content-Type-Options']='nosniff';response.headers['X-Frame-Options']='DENY';response.headers['Referrer-Policy']='no-referrer';response.headers['Permissions-Policy']='camera=(), microphone=(), geolocation=()'
         response.headers['Content-Security-Policy']="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
@@ -183,8 +189,14 @@ def create_app(settings=None,gateway=None):
         if not session:
             used=db.get(UsedRefresh,hashed)
             if used:
-                old=db.get(Session,used.session_id)
-                if old:old.revoked=True;audit(db,db.get(User,old.user_id),'refresh.replay',request,s)
+                owner_id=db.scalar(select(Session.user_id).where(Session.id==used.session_id))
+                user=locked_user(db,owner_id) if owner_id else None
+                old=db.scalar(select(Session).where(Session.id==used.session_id).with_for_update().execution_options(populate_existing=True))
+                # Revoke this refresh family, once. A stale token must not let
+                # an attacker repeatedly log out independent, later sessions.
+                if old and not old.revoked:
+                    old.revoked=True;audit(db,user,'refresh.replay',request,s)
+                    if user:notify(db,s,user,'Session revoked after token replay','A previously rotated refresh token was reused. The affected session was revoked. Review your devices and use Log out everywhere or reset your password if this was not you.')
                 db.commit()
             fail()
         user=locked_user(db,session.user_id)

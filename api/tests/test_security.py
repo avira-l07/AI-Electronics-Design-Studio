@@ -7,7 +7,7 @@ from api.app import create_app
 from api.config import Settings
 from api.models import Base, User, Profile, Session, Token, Subscription, Payment, Mail, Webhook, now, seed
 from api.security import decrypt, cookie_name, passwords, digest, random_token, encrypt
-from api.billing import StripeGateway
+from api.billing import StripeGateway, STRIPE_API_VERSION
 
 PASSWORD='Correct horse battery staple 73!'
 class Gateway(StripeGateway):
@@ -39,7 +39,7 @@ def verified_user(app,email='alice@example.com',password=PASSWORD):
     return id
 def login(client,email='alice@example.com',password=PASSWORD):return post(client,'/api/auth/login',{'email':email,'password':password})
 def event(client,s,id,kind,obj):
-    raw=json.dumps({'id':id,'type':kind,'data':{'object':obj}},separators=(',',':')).encode();stamp=str(now());signature=hmac.new(s.webhook_key.encode(),stamp.encode()+b'.'+raw,hashlib.sha256).hexdigest()
+    raw=json.dumps({'id':id,'type':kind,'api_version':STRIPE_API_VERSION,'data':{'object':obj}},separators=(',',':')).encode();stamp=str(now());signature=hmac.new(s.webhook_key.encode(),stamp.encode()+b'.'+raw,hashlib.sha256).hexdigest()
     return client.post('/api/payments/webhook',content=raw,headers={'stripe-signature':f't={stamp},v1={signature}','Content-Type':'application/json'})
 def subscription(app,gateway,user_id,status='active'):
     with app.state.Factory.begin() as db:
