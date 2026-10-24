@@ -1,6 +1,8 @@
 # AI Engineering Design Studio
 
-Current v14 UI: [workbench review and guide](V14_WORKBENCH_REVIEW.md). Adds an organized CAD workbench, light/dark editing panels, card/list parts browsing, a keyboard-accessible tool finder, camera dock, clearer property controls and improved narrow layouts. All new local UI controls remain Free.
+Current v15 appearance: [color combinations and effects](V15_COLOR_AND_EFFECTS.md). Shared evergreen/ivory/graphite and cobalt palettes, consistent light/dark editing panels, readable labels, restrained hover/dialog effects and reduced-motion support.
+
+Previous v14 UI: [workbench review and guide](V14_WORKBENCH_REVIEW.md). Adds an organized CAD workbench, light/dark editing panels, card/list parts browsing, a keyboard-accessible tool finder, camera dock, clearer property controls and improved narrow layouts. All new local UI controls remain Free.
 
 Previous v13 usability: [review and workflow](V13_USABILITY_REVIEW.md). Adds drag-and-snap and guided face attachment, actual part thumbnails, pre-insertion size/material previews, direct canvas selection, an expanded workspace and faster access to customization. All new local tools remain Free.
 
