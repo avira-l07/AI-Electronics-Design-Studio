@@ -1,5 +1,7 @@
 # AI Engineering Design Studio
 
+Current v15.4: [user-perspective UX audit and fixes](UX_AUDIT_2026-10-24.md). Restores project commands, fractional price entry, session form drafts, public account-mode resource browsing, embedded 3D page scrolling, sticky tables and clearer feedback. Separates confirmed findings from claims about overridden legacy code. Cloud activation and paid services remain unchanged.
+
 Current v15.3: [zero-cost beta delivery and limitations](FREE_BETA_DELIVERY.md). Includes a loopback-only synthetic account demo, optional installed-model Ollama proposals, free-host preparation, HTTPS outbox delivery, expiring complimentary Pro access and account-lock/assembly-cache reliability fixes. Cloud/provider activation remains unverified until accounts are configured.
 
 Current project status: [24 October 2026 audit](PROJECT_STATUS_AUDIT_2026-10-24.md) and [roadmap](PROJECT_STATUS_AND_ROADMAP.md). The audit distinguishes locally verified features from held cloud activation and remaining CAD/manufacturing acceptance.

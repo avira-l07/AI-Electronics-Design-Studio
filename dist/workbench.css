@@ -12,7 +12,8 @@
   grid-template-areas: "heading heading heading" "toolbar toolbar toolbar" "coach coach coach" "parts viewport inspector" "status status status";
   grid-template-columns: 272px minmax(0,1fr) 300px;
   grid-template-rows: auto auto auto minmax(0,1fr) auto;
-  height: 880px;
+  height: min(880px, calc(100dvh - 32px));
+  min-height: 580px;
   border: 1px solid #91a59a;
   border-radius: 14px;
   background: #1c282f;
@@ -108,7 +109,7 @@
 .editor3d .v3d-empty-icon { color:#c9e5b1; border:1px solid #95b68b; border-radius:18px; width:70px; height:70px; background:#284b3f99; box-shadow:0 10px 30px #091e2a33; }
 .editor3d .v3d-empty p { font-size:20px; font-weight:500; max-width:330px; line-height:1.4; color:#eff5ed; }
 .editor3d .v3d-empty small { color:#becfcf; font-size:12px; line-height:1.9; }
-.editor3d .inspectorJump { position:sticky; top:0; gap:3px; padding:11px; background:var(--wb-panel); border-color:var(--wb-line); }
+.editor3d .inspectorJump { position:sticky; top:0; z-index:4; gap:3px; padding:11px; background:var(--wb-panel); border-color:var(--wb-line); }
 .editor3d .inspectorJump button { color:var(--wb-ink); background:var(--wb-card); border:1px solid var(--wb-line); border-radius:6px; padding:9px; font-size:12px; min-height:36px; }
 .editor3d .inspectorJump [aria-pressed=true] { background:var(--wb-selected); border-color:#9bb68c; }
 .editor3d .inspector-head { padding:12px 15px; color:var(--wb-muted); background:var(--wb-soft); border-color:var(--wb-line); font-size:9px; letter-spacing:1.3px; }
@@ -158,7 +159,7 @@
 .workbenchStatus i { display:inline-block; width:5px; height:5px; border-radius:50%; background:#c7e3a6; margin-right:5px; }
 .workbenchStatus .tb-coords { font:10px ui-monospace,Consolas,monospace; color:#d3e0d6; }
 .workbenchStatus button { color:#ccddce; background:transparent; border:0; padding:2px; font-size:10px; }
-.studioFocus .editor3d { inset:8px; width:calc(100vw - 16px); height:calc(100dvh - 16px); box-shadow:0 0 0 12px #142a22; }
+.studioFocus .editor3d { inset:8px; width:calc(100vw - 16px); height:calc(100dvh - 16px); min-height:0; box-shadow:0 0 0 12px #142a22; }
 .studioFocus .editor3d-toolbar { max-height:none; }
 .v3dCreateBar { gap:8px; padding:14px; border:1px solid var(--studio-border); background:var(--solid-surface,#fff); border-radius:10px; }
 .v3dCreateBar button { min-height:36px; font-size:11px; padding:8px 12px; border-radius:6px; }

@@ -1,5 +1,7 @@
 # Engineering Studio — current delivery checklist
 
+Latest v15.4: [verified UX audit](UX_AUDIT_2026-10-24.md). Fixes command actions, fractional prices, unapplied form retention, public template/guide browsing, 3D scrolling, table headers, circuit contrast, inspector stacking, export feedback and empty BOM guidance. Account project routes remain protected; deeper CAD and cloud dependencies below remain outstanding.
+
 Latest v15.3: [free-beta delivery and outstanding items](FREE_BETA_DELIVERY.md). Delivered: account-first token locks, incremental custom-solid loading, HTTPS outbox adapter, opt-in request-triggered delivery, expiring complimentary Pro and a one-command local synthetic demo. Free cloud deployment is authorized but not yet configured; no paid service or live billing is enabled.
 
 Optional local AI now uses the installed phi4-mini:3.8b model with explicit opt-in. Actual recipe, kernel and browser preview/apply/save acceptance passed; hosted AI and broader quality acceptance remain outstanding.
@@ -7,6 +9,8 @@ Optional local AI now uses the installed phi4-mini:3.8b model with explicit opt-
 Reviewed 24 October 2026 against v15.2. Current evidence and review findings: [status audit](PROJECT_STATUS_AUDIT_2026-10-24.md), [v15.2 recovery/security](api/RESIDUAL_RISK_REVIEW.md) and [v15 appearance](V15_COLOR_AND_EFFECTS.md). Previous milestone reports remain historical evidence. Completed means the bounded implementation below; it does not mean professional CAD, operational cloud services or manufacturing certification.
 
 ## Delivered and locally verified
+
+- [x] v15.4 UX audit: 125 browser checks passed, one expected phone skip; 22 new cases; all 12 JavaScript suites and the 48-public-asset guard passed. Active code was checked against every supplied finding.
 
 - [x] v15.3: 169 API checks; 103 browser checks with one expected phone skip (two selector failures corrected and rerun); all 12 JavaScript suites and 14 independent export parser checks. Actual installed-model inference and browser review/apply/save passed. No paid provider was called.
 

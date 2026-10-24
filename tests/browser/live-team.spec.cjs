@@ -3,6 +3,30 @@ const test=base.extend({liveOrigin:[async({},use)=>{const port=await new Promise
 async function send(context,origin,url,method='POST',data={}){const token=(await(await context.request.get(origin+'/api/csrf')).json()).token;return context.request.fetch(origin+'/api'+url,{method,data,headers:{Origin:origin,'X-CSRF-Token':token}});}
 async function account(browser,origin,name,viewport){const context=await browser.newContext({viewport}),page=await context.newPage();await page.goto(origin+'/#/login');await page.locator('#secureEmail').fill(name+'@example.com');await page.locator('#securePassword').fill('Synthetic test password 739!');await page.locator('#secureAuth button[type=submit]').click();await expect(page.locator('[data-team-inbox]')).toBeVisible();return {context,page};}
 
+test('guests browse templates and guide while project data stays protected; login returns to templates',async({browser,liveOrigin},info)=>{
+ const context=await browser.newContext({viewport:info.project.use.viewport}),page=await context.newPage();
+ try{
+  await page.goto(liveOrigin+'/#/landing');await page.locator('.landingStarterGrid a').first().click();await expect(page.locator('#studioMain h1')).toHaveText('Starter templates');await expect(page.locator('.modeBadge')).toHaveText('PUBLIC RESOURCES');
+  expect((await context.request.get(liveOrigin+'/api/projects')).status()).toBe(401);
+  await page.goto(liveOrigin+'/#/guide');await expect(page.locator('#studioMain h1')).toHaveText('Studio guide');
+  for(const route of ['library','settings']){await page.goto(liveOrigin+'/#/'+route);await expect(page.locator('#secureAuth')).toBeVisible();await expect(page.locator('.authFormSide')).toContainText('Log in to open '+route);}
+  await page.goto(liveOrigin+'/#/templates');await page.locator('[data-use-template]').first().click();await expect(page.locator('#secureAuth')).toBeVisible();await expect(page).toHaveURL(/next=templates$/);
+  await page.locator('#secureEmail').fill('owner@example.com');await page.locator('#securePassword').fill('Synthetic test password 739!');await page.locator('#secureAuth button[type=submit]').click();await expect(page.locator('#studioMain h1')).toHaveText('Starter templates');await expect(page.locator('[data-use-template]').first()).toContainText('Use this template');
+ }finally{await context.close();}
+});
+
+test('authenticated form drafts survive tabs but are not sent until explicitly applied',async({browser,liveOrigin},info)=>{
+ const owner=await account(browser,liveOrigin,'owner',info.project.use.viewport),page=owner.page;let id;
+ try{
+  const body={name:'Synthetic form-draft test',material:'Steel',stroke:80,rod:150,rpm:600,parts:[],notes:[],revisions:[]};
+  const created=await send(owner.context,liveOrigin,'/projects','POST',body);expect(created.status()).toBe(201);id=(await created.json()).id;
+  await page.evaluate(id=>localStorage.setItem('studio-active-project-v1',id),id);await page.goto(liveOrigin+'/#/workspace?tool=design');await page.reload();await page.locator('#stroke').fill('123.5');await page.goto(liveOrigin+'/#/workspace?tool=electronics');await page.locator('#electrical').fill('Private unapplied test note');await page.goto(liveOrigin+'/#/workspace?tool=design');await expect(page.locator('#stroke')).toHaveValue('123.5');
+  let rows=await(await owner.context.request.get(liveOrigin+'/api/projects')).json();expect(rows.find(p=>p.id===id).stroke).toBe(80);expect(rows.find(p=>p.id===id).electrical||'').toBe('');
+  await page.locator('#apply').click();await page.evaluate(()=>studioBackend.flush());rows=await(await owner.context.request.get(liveOrigin+'/api/projects')).json();expect(rows.find(p=>p.id===id).stroke).toBe(123.5);expect(rows.find(p=>p.id===id).electrical||'').toBe('');
+  await page.goto(liveOrigin+'/#/workspace?tool=electronics');await expect(page.locator('#electrical')).toHaveValue('Private unapplied test note');await page.locator('#saveElectrical').click();await page.evaluate(()=>studioBackend.flush());await page.reload();await expect(page.locator('#electrical')).toHaveValue('Private unapplied test note');
+ }finally{if(id){const row=(await(await owner.context.request.get(liveOrigin+'/api/projects')).json()).find(p=>p.id===id);if(row)await send(owner.context,liveOrigin,'/projects/'+id,'DELETE',{version:row.version});}await owner.context.close();}
+});
+
 test('free-beta account screens disclose no charging and expiring complimentary access',async({browser,liveOrigin},info)=>{
  const context=await browser.newContext({viewport:info.project.use.viewport});
  try{

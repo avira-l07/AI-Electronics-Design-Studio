@@ -1,5 +1,7 @@
 # Engineering Studio — status and remaining work
 
+Latest v15.4: [user-perspective audit](UX_AUDIT_2026-10-24.md) reviews all supplied UX findings and delivers the confirmed fixes. Public resource browsing does not expose account projects; unapplied form drafts do not silently save. The v15.3 free-beta architecture and outstanding cloud/manufacturing/CAD limits remain below.
+
 Current follow-up v15.3: [zero-cost beta delivery](FREE_BETA_DELIVERY.md). The owner has authorized a free-tier beta, with paid services/live charges still disabled. Account/token lock ordering and the custom-assembly cache lifecycle are corrected in source. A synthetic loopback demo is runnable now. Render Free/Neon preparation is provided; actual cloud/provider acceptance remains blocked by missing access/configuration. The v15.2 review below is historical context.
 
 Optional installed-model Ollama proposals are now available in that local demo. Actual inference, closed-solid geometry and preview/apply/save/reload passed with a synthetic plate. Cloud AI remains disabled; a local success is not general AI quality or manufacturing acceptance.
