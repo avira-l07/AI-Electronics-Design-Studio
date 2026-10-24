@@ -19,7 +19,7 @@ def main():
         if not s.database_url.startswith('postgresql'):raise RuntimeError('Production PostgreSQL is not configured')
         engine,_=database(s.database_url)
         with engine.connect() as c:
-            c.execute(text('SELECT 1'));versions=set(c.execute(text('SELECT version FROM schema_migrations')).scalars());checks['database_schema']='pass' if {'0001','0002','0003','0004'}<=versions else 'migration required'
+            c.execute(text('SELECT 1'));versions=set(c.execute(text('SELECT version FROM schema_migrations')).scalars());checks['database_schema']='pass' if {'0001','0002','0003','0004','0005'}<=versions else 'migration required'
         engine.dispose()
     except Exception:checks['database_schema']='unreachable or migration required'
     print(json.dumps(checks,indent=2));return 0 if all(checks.get(k)=='pass' for k in ['configuration','production_mode','database_schema']) and checks['postgresql']=='configured' and checks['smtp'].startswith('configured') else 1

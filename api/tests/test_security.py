@@ -89,7 +89,7 @@ def test_password_reset_expiry_single_use_revocation(env):
 def test_account_lock_and_persistent_ip_limit(env):
     app,c,g,s=env;id=verified_user(app)
     for _ in range(5):assert login(c,password='wrong').status_code==401
-    assert login(c).status_code==401
+    result=login(c);assert result.status_code==200 and result.json()['confirmation_required']
     with app.state.Factory() as db:assert db.get(User,id).locked_until>now()
     for _ in range(5):assert post(c,'/api/auth/forgot',{'email':'unknown@example.com'}).status_code==202
     assert post(c,'/api/auth/forgot',{'email':'unknown@example.com'}).status_code==429

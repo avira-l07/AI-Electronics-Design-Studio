@@ -2,6 +2,24 @@ const {test:base,expect}=require('@playwright/test'),{spawn}=require('node:child
 const test=base.extend({liveOrigin:[async({},use)=>{const port=await new Promise(resolve=>{const server=net.createServer();server.listen(0,'127.0.0.1',()=>{const port=server.address().port;server.close(()=>resolve(port));});}),dir=fs.mkdtempSync(path.join(os.tmpdir(),'studio-team-')),python=process.env.STUDIO_PYTHON||(process.platform==='win32'?'.venv/Scripts/python.exe':'python'),child=spawn(python,['tests/live-server.py',String(port),dir],{cwd:path.resolve('.'),stdio:['ignore','pipe','pipe'],windowsHide:true}),origin='http://127.0.0.1:'+port;let logs='';child.stdout.on('data',v=>logs+=v);child.stderr.on('data',v=>logs+=v);try{await expect.poll(async()=>{if(child.exitCode!==null)throw Error(logs);try{return (await fetch(origin+'/api/config')).status;}catch{return 0;}},{timeout:30000}).toBe(200);await use(origin);}finally{if(logs.includes('ERROR'))process.stderr.write(logs);child.kill();await new Promise(resolve=>{if(child.exitCode!==null)return resolve();child.once('exit',resolve);});}}, {scope:'worker'}]});
 async function send(context,origin,url,method='POST',data={}){const token=(await(await context.request.get(origin+'/api/csrf')).json()).token;return context.request.fetch(origin+'/api'+url,{method,data,headers:{Origin:origin,'X-CSRF-Token':token}});}
 async function account(browser,origin,name,viewport){const context=await browser.newContext({viewport}),page=await context.newPage();await page.goto(origin+'/#/login');await page.locator('#secureEmail').fill(name+'@example.com');await page.locator('#securePassword').fill('Synthetic test password 739!');await page.locator('#secureAuth button[type=submit]').click();await expect(page.locator('[data-team-inbox]')).toBeVisible();return {context,page};}
+test('locked owner completes email confirmation without a password reset or automatic link login',async({browser,liveOrigin},info)=>{
+ const context=await browser.newContext({viewport:info.project.use.viewport}),page=await context.newPage();
+ try{
+  await page.goto(liveOrigin+'/#/login');await page.locator('#secureEmail').fill('locked@example.com');await page.locator('#securePassword').fill('Synthetic test password 739!');await page.locator('#secureAuth button[type=submit]').click();
+  await expect(page.locator('#secureStatus')).toContainText('Check your email');await expect(page).toHaveURL(/#\/login$/);expect((await context.request.get(liveOrigin+'/api/me')).status()).toBe(401);
+  await page.goto(liveOrigin+'/#/confirm-login?token=test-only-confirmation-token-for-locked-user');await expect(page.getByRole('heading',{name:'Confirm your sign-in',exact:true})).toBeVisible();expect((await context.request.get(liveOrigin+'/api/me')).status()).toBe(401);
+  await page.locator('#recoveryForm button[type=submit]').click();await expect(page.locator('[data-team-inbox]')).toBeVisible();await expect(page).toHaveURL(/#\/dashboard$/);expect((await context.request.get(liveOrigin+'/api/me')).status()).toBe(200);
+ }finally{await context.close();}
+});
+test('team manager displays and cancels an invitation for an unregistered email',async({browser,liveOrigin},info)=>{
+ const owner=await account(browser,liveOrigin,'owner',info.project.use.viewport);
+ try{
+  await owner.page.goto(liveOrigin+'/#/workspace?tool=3d');await expect(owner.page.locator('#v3dLoad')).toBeHidden();await owner.page.locator('#projectServices').click();await owner.page.locator('#manageProjectTeam').click();
+  await owner.page.locator('#teamEmail').fill('notregistered@example.com');await owner.page.locator('#inviteProjectMember').click();await expect(owner.page.locator('[data-revoke-invite]')).toHaveCount(1);await expect(owner.page.locator('#modalFields')).toContainText('notregistered@example.com');
+  const members=await(await owner.context.request.get(liveOrigin+'/api/team/projects/shared-browser-project/members')).json();expect(members.some(m=>m.email==='notregistered@example.com')).toBe(false);
+  await owner.page.locator('[data-revoke-invite]').click();await expect(owner.page.locator('#modalFields')).toContainText('No pending invitations.');await expect(owner.page.locator('[data-revoke-invite]')).toHaveCount(0);
+ }finally{await owner.context.close();}
+});
 test('independent real account sessions share 3D edits and presence, preserve conflicts, and enforce viewer/revoke',async({browser,liveOrigin},testInfo)=>{
  const origin=liveOrigin,owner=await account(browser,origin,'owner',{width:1440,height:1000}),editor=await account(browser,origin,'editor',{width:390,height:844}),viewer=await account(browser,origin,'viewer',{width:1024,height:768}),url='/team/projects/shared-browser-project';
  try{

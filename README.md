@@ -1,5 +1,7 @@
 # AI Engineering Design Studio
 
+Current security follow-up v15.1: [submitted threat-report audit](api/THREAT_REPORT_AUDIT.md). Adds private pending invitations, owner sign-in recovery during lockout, explicit local-data notices and regression tests. Backend deployment remains held.
+
 Current v15 appearance: [color combinations and effects](V15_COLOR_AND_EFFECTS.md). Shared evergreen/ivory/graphite and cobalt palettes, consistent light/dark editing panels, readable labels, restrained hover/dialog effects and reduced-motion support.
 
 Previous v14 UI: [workbench review and guide](V14_WORKBENCH_REVIEW.md). Adds an organized CAD workbench, light/dark editing panels, card/list parts browsing, a keyboard-accessible tool finder, camera dock, clearer property controls and improved narrow layouts. All new local UI controls remain Free.

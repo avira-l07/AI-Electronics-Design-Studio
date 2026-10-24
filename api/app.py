@@ -129,16 +129,35 @@ def create_app(settings=None,gateway=None):
     def login(body:Login,request:Request,response:Response,db=Depends(db_session)):
         rate(db,request,'login',30);user=db.scalar(select(User).where(User.email==str(body.email).lower()).with_for_update())
         valid=verify_password(user.password if user else None,body.password)
-        if not user or not valid or user.locked_until>now() or user.deleted or user.banned:
+        if not user or not valid or user.deleted or user.banned:
             if user and user.locked_until<=now():
                 user.failures+=1
                 if user.failures>=5:user.locked_until=now()+900
                 audit(db,user,'login.failed',request,s)
-                if user.failures==5:notify(db,s,user,'Sign-in temporarily locked','Repeated unsuccessful attempts were detected. Sign-in is paused for 15 minutes.')
+                if user.failures==5:notify(db,s,user,'Unsuccessful sign-in attempts detected','Repeated unsuccessful attempts were detected. You can still sign in with your password and an email confirmation or your enabled second factor. Reset your password if these attempts were not yours.')
             db.commit();fail(401,'Invalid credentials or account unavailable')
         if not user.verified:fail(403,'Verify your email before signing in')
+        # Keep account-wide attack detection without allowing an unknown party
+        # to deny the owner access. A correct password can use a bound factor.
+        if user.locked_until>now():
+            if user.totp:return login_result(db,user,request,response)
+            pending=db.scalar(select(Token).where(Token.user_id==user.id,Token.purpose=='confirm-login',Token.used==False,Token.expires>now()))
+            if not pending:
+                raw=action_token(db,user,'confirm-login',600,str(user.epoch))
+                notify(db,s,user,'Confirm your Studio sign-in','Someone entered your correct password after unsuccessful attempts. Only continue if you are signing in. This link opens a session in the browser where you confirm it and expires in 10 minutes: '+s.origin+'/#/confirm-login?token='+raw)
+            return {'confirmation_required':True,'message':'Check your email to confirm this sign-in. The link expires in 10 minutes; existing valid links are not replaced. You can also reset your password.'}
         user.failures=0;user.locked_until=0
         if passwords.check_needs_rehash(user.password):user.password=passwords.hash(body.password)
+        return login_result(db,user,request,response)
+    @app.post('/api/auth/confirm-login')
+    def confirm_login(body:TokenInput,request:Request,response:Response,db=Depends(db_session)):
+        # Lock the account before its token, matching session revocation/reset.
+        # Read only the ID initially, avoiding a stale cached Token on a retry.
+        user_id=db.scalar(select(Token.user_id).where(Token.digest==digest(body.token),Token.purpose=='confirm-login'))
+        if not user_id:fail(400,'Sign-in confirmation expired or invalid')
+        user=locked_user(db,user_id);token=consume_token(db,body.token,'confirm-login')
+        if not user or user.deleted or user.banned or not user.verified or token.data!=str(user.epoch):fail(400,'Sign-in confirmation expired or invalid')
+        user.failures=0;user.locked_until=0;audit(db,user,'login.email_confirmed',request,s)
         return login_result(db,user,request,response)
     @app.post('/api/auth/mfa')
     def finish_mfa(body:OTPInput,request:Request,response:Response,db=Depends(db_session)):
@@ -149,7 +168,7 @@ def create_app(settings=None,gateway=None):
             token.attempts+=1
             if token.attempts>=5:token.used=True
             db.commit();fail(401,'Invalid second factor')
-        token.used=True;new_session(db,s,user,request,response);return {'authenticated':True}
+        token.used=True;user.failures=0;user.locked_until=0;new_session(db,s,user,request,response);return {'authenticated':True}
     @app.post('/api/auth/refresh')
     def refresh(request:Request,response:Response,db=Depends(db_session)):
         rate(db,request,'refresh',120);hashed=digest(request.cookies.get(cookie_name(s,'refresh'),''))
@@ -332,14 +351,14 @@ def create_app(settings=None,gateway=None):
     @app.get('/api/account/export')
     def export_account(who=Depends(auth),db=Depends(db_session)):
         user,session=who;recent(user,session)
-        return {'account':public_user(db,user,session),'team_comments':[{'project_id':c.project_id,'body':c.body,'created':c.created} for c in db.scalars(select(ProjectComment).where(ProjectComment.user_id==user.id))],'team_memberships':[{'project_id':m.project_id,'role':m.role,'accepted':m.accepted} for m in db.scalars(select(ProjectMember).where(ProjectMember.user_id==user.id))],'notifications':[{'message':n.message,'created':n.created} for n in db.scalars(select(Notice).where(Notice.user_id==user.id))],'billing':[{'id':p.id,'amount':p.amount,'currency':p.currency,'status':p.status,'refunded':p.refunded} for p in db.scalars(select(Payment).where(Payment.user_id==user.id))],'projects':[{**json.loads(p.data),'id':p.id,'profile_id':p.profile_id,'version':p.version,'trashed':p.trashed} for p in db.scalars(select(Project).where(Project.user_id==user.id))]}
+        return {'account':public_user(db,user,session),'team_invitations':[{'project_id':i.project_id,'email':i.email,'role':i.role,'expires':i.expires} for i in db.scalars(select(ProjectInvitation).where((ProjectInvitation.email==user.email)|(ProjectInvitation.project_id.in_(select(Project.id).where(Project.user_id==user.id)))))],'team_comments':[{'project_id':c.project_id,'body':c.body,'created':c.created} for c in db.scalars(select(ProjectComment).where(ProjectComment.user_id==user.id))],'team_memberships':[{'project_id':m.project_id,'role':m.role,'accepted':m.accepted} for m in db.scalars(select(ProjectMember).where(ProjectMember.user_id==user.id))],'notifications':[{'message':n.message,'created':n.created} for n in db.scalars(select(Notice).where(Notice.user_id==user.id))],'billing':[{'id':p.id,'amount':p.amount,'currency':p.currency,'status':p.status,'refunded':p.refunded} for p in db.scalars(select(Payment).where(Payment.user_id==user.id))],'projects':[{**json.loads(p.data),'id':p.id,'profile_id':p.profile_id,'version':p.version,'trashed':p.trashed} for p in db.scalars(select(Project).where(Project.user_id==user.id))]}
     @app.delete('/api/account')
     def delete_account(body:Credentials,request:Request,response:Response,who=Depends(auth),db=Depends(db_session)):
         rate(db,request,'delete-account',5);user,session=who;recent(user,session)
         reauthenticate(user,body) if user.password else (None if check_otp(s,user,body.code) else fail(403,'Enable and verify a second factor before deleting a Google-only account'))
         # If provider cancellation fails, the transaction aborts; never leave a deleted user renewing silently.
         for sub in db.scalars(select(Subscription).where(Subscription.user_id==user.id,Subscription.status.not_in(['canceled','incomplete_expired']))):app.state.gateway.cancel(sub.id,immediate=True);sub.status='canceled';sub.ends=now()
-        revoke_all(db,user);db.execute(delete(ProjectPresence).where(ProjectPresence.user_id==user.id));db.execute(delete(ProjectComment).where(ProjectComment.user_id==user.id));db.execute(delete(ProjectMember).where(ProjectMember.user_id==user.id));db.execute(delete(Token).where(Token.user_id==user.id));db.execute(delete(Notice).where(Notice.user_id==user.id));db.execute(delete(Mail).where(Mail.user_id==user.id));db.execute(delete(Project).where(Project.user_id==user.id));db.execute(delete(Profile).where(Profile.user_id==user.id))
+        revoke_all(db,user);db.execute(delete(ProjectInvitation).where(ProjectInvitation.email==user.email));db.execute(delete(ProjectPresence).where(ProjectPresence.user_id==user.id));db.execute(delete(ProjectComment).where(ProjectComment.user_id==user.id));db.execute(delete(ProjectMember).where(ProjectMember.user_id==user.id));db.execute(delete(Token).where(Token.user_id==user.id));db.execute(delete(Notice).where(Notice.user_id==user.id));db.execute(delete(Mail).where(Mail.user_id==user.id));db.execute(delete(Project).where(Project.user_id==user.id));db.execute(delete(Profile).where(Profile.user_id==user.id))
         user.deleted=True;user.email='deleted-'+user.id+'@invalid.example';user.name='Deleted account';user.password=None;user.google_sub=None;user.totp=None;user.totp_pending=None;user.recovery='[]';user.checkout_url=None
         audit(db,user,'account.deleted',request,s);clear_auth(s,response);return {'deleted':True,'retained':'Pseudonymous payment and audit records are retained under the deployment retention policy.'}
 

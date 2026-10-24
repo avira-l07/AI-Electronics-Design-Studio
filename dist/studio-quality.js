@@ -71,7 +71,7 @@ settingsPage=function(){return qualitySettings().replace('</main>','<section cla
 const qualityLibrary=libraryPage;
 libraryPage=function(){return qualityLibrary().replace('<button id="dashboardImport">','<button data-backup-center>Backups</button><button id="dashboardImport">');};
 const qualityAccountShell=accountShell;
-accountShell=function(...args){return qualityAccountShell(...args).replace('<div class="accountHeading">','<div class="deviceNotice"><span>◉ Device workspace · Keep a backup of your projects</span><button data-backup-center>Back up studio ↗</button></div><div class="accountHeading">');};
+accountShell=function(...args){return qualityAccountShell(...args).replace('<div class="accountHeading">','<div class="deviceNotice"><span>◉ Device workspace · Anyone using this browser profile can access these projects</span><button data-backup-center>Back up studio ↗</button></div><div class="accountHeading">');};
 const qualityRender=render;
 render=function(){for(const id of ['export','saveRevision'])$('#'+id).disabled=!projects.length;if($('#workspaceOptions'))$('#workspaceOptions').disabled=!projects.length;qualityRender();showStorageHealth();if($('#electrical'))$('#electrical').maxLength=10000;document.querySelectorAll('#modalFields input[type=text]').forEach(el=>el.maxLength=200);};
 function notFoundPage(){return `${publicHeader()}<main class="confirmationMain"><span class="eyebrow">404 / PAGE NOT FOUND</span><h1>Let’s get you back to your studio.</h1><p>This page does not exist. Your saved projects are still in your library.</p><div class="heroActions">${routeLink('dashboard','Open dashboard','pbutton primary')}${routeLink('library','Project library','pbutton')}</div></main>${publicFooter()}`;}

@@ -1,6 +1,8 @@
 # Secure API and frontend integration
 
-This is a runnable implementation and review baseline, not a security certification. The published Sites origin remains a private frontend preview. Python, PostgreSQL, SMTP, Google and Stripe are not provisioned by uploading static files.
+Latest security changes and migration 0005: [submitted threat-report audit](THREAT_REPORT_AUDIT.md). Apply `python -m api.migrate` before starting the upgraded backend. The owner has held cloud deployment pending host/domain details.
+
+This is a runnable implementation and review baseline, not a security certification. The published Sites origin remains a static frontend preview with its existing access policy. Python, PostgreSQL, SMTP, Google and Stripe are not provisioned by uploading static files.
 
 ## Folder structure
 

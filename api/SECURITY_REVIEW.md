@@ -1,5 +1,9 @@
 # Security review and release checklist
 
+## Current follow-up
+
+See [the submitted threat-report audit](THREAT_REPORT_AUDIT.md) for the v15.1 fixes and current verification. Historical test counts below describe the original milestone.
+
 ## Review result
 
 The prior version was explicitly a browser-local prototype. Its email matching, local session flag, project storage and demo receipts were not account security, authorization or payment evidence. Those screens remain previews on the static Sites host. `dist/server-mode.js` switches to real API calls only when the same origin exposes `/api/config` in server mode. The Python API is the enforceable boundary. See `VALIDATION.md` for the 25 passing tests, browser checks and 44-package advisory audit.
@@ -8,11 +12,11 @@ The prior version was explicitly a browser-local prototype. Its email matching, 
 
 **Risk:** Plaintext/fast-hashed passwords, leaked reset links, enumerable accounts, reusable refresh tokens, unrevocable JWTs and unbounded login attempts permit account takeover.
 
-**Fix/code:** `security.py` uses Argon2id (64 MiB, three iterations, one lane), hashes random action/refresh tokens, checks expirations, rotates refresh values and detects replay. `app.py` verifies email, implements reset/reauthentication, and checks a live DB session plus user epoch for every authenticated request. Cookies are `HttpOnly`, `SameSite=Lax`, `Secure` and `__Host-` prefixed in production; tokens never enter localStorage. Per-IP persistent quotas and five failed passwords trigger a temporary account lock. Unknown users still perform a dummy Argon2 verification. Signup/forgot responses are generic.
+**Fix/code:** `security.py` uses Argon2id (64 MiB, three iterations, one lane), hashes random action/refresh tokens, checks expirations, rotates refresh values and detects replay. `app.py` verifies email, implements reset/reauthentication, and checks a live DB session plus user epoch for every authenticated request. Cookies are `HttpOnly`, `SameSite=Lax`, `Secure` and `__Host-` prefixed in production; tokens never enter localStorage. Per-IP persistent quotas and five failed passwords trigger an account-wide step-up period. A correct password during that period requires existing MFA or a ten-minute, single-use email confirmation; it does not leave the owner with an unavoidable password lockout. Unknown users still perform a dummy Argon2 verification. Signup/forgot responses are generic.
 
 TOTP secrets and OAuth state are encrypted with Fernet. OTP steps cannot be replayed; recovery codes are hashed and consumed once. MFA enrollment revokes other sessions. Google validates state, PKCE, nonce, issuer, audience, signature and verified email. Existing-email auto-linking is rejected. Login alerts are queued, not sent inside the authentication transaction.
 
-**Limits:** Rate limits also need proxy-level protections and load testing. A temporary account lock can be abused for denial of access; consider progressive challenges/passkeys as traffic grows. Credential-stuffing detection, breached-password checks and stronger MFA recovery/support procedures are production follow-ups. SMTP/Google integrations require real configuration and tests.
+**Limits:** Rate limits also need proxy-level protections and load testing. The step-up path mitigates targeted account lockout; real SMTP delivery, edge request controls and challenge support still need operational acceptance. Credential-stuffing detection, breached-password checks and stronger MFA recovery/support procedures are production follow-ups. SMTP/Google integrations require real configuration and tests.
 
 Reference: [OWASP password storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html), [Google OIDC](https://developers.google.com/identity/openid-connect/openid-connect).
 

@@ -97,7 +97,7 @@ def consume_token(db,raw,purpose):
     token.used=True;return token
 def revoke_all(db,user):
     user.epoch+=1;db.execute(update(Session).where(Session.user_id==user.id).values(revoked=True))
-    db.execute(update(Token).where(Token.user_id==user.id,Token.purpose=='mfa').values(used=True))
+    db.execute(update(Token).where(Token.user_id==user.id,Token.purpose.in_(['mfa','confirm-login'])).values(used=True))
 def check_otp(settings,user,code):
     if not user.totp:return False
     secret=decrypt(settings,user.totp);step=now()//30

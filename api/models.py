@@ -89,6 +89,14 @@ class ProjectComment(Base):
     user_id: Mapped[str]=mapped_column(ForeignKey('users.id',ondelete='CASCADE'),index=True)
     body: Mapped[str]=mapped_column(String(2000))
     created: Mapped[int]=mapped_column(Integer,default=now)
+class ProjectInvitation(Base):
+    __tablename__='project_invitations'
+    __table_args__=(UniqueConstraint('project_id','email'),)
+    id: Mapped[str]=mapped_column(String(36),primary_key=True,default=uid)
+    project_id: Mapped[str]=mapped_column(ForeignKey('projects.id',ondelete='CASCADE'),index=True)
+    email: Mapped[str]=mapped_column(String(254),index=True)
+    role: Mapped[str]=mapped_column(String(12))
+    expires: Mapped[int]=mapped_column(Integer)
 class ProjectPresence(Base):
     __tablename__='project_presence'
     project_id: Mapped[str]=mapped_column(ForeignKey('projects.id',ondelete='CASCADE'),primary_key=True)

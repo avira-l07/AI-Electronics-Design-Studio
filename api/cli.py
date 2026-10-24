@@ -3,7 +3,7 @@ import argparse, json, smtplib, ssl
 from email.message import EmailMessage
 from sqlalchemy import select, delete
 from api.app import create_app
-from api.models import Base, User, Mail, Rate, UsedRefresh, Token, Audit, now, seed
+from api.models import Base, User, Mail, Rate, UsedRefresh, Token, Audit, ProjectInvitation, now, seed
 from api.security import decrypt
 from api.billing import sync_subscription
 
@@ -41,7 +41,7 @@ def main():
                 sync_subscription(db,s,app.state.gateway,user,sub.id)
             print('Subscription states reconciled against Stripe.')
         elif args.command=='cleanup':
-            db.execute(delete(Rate).where(Rate.expires<now()));db.execute(delete(UsedRefresh).where(UsedRefresh.expires<now()));db.execute(delete(Token).where(Token.expires<now()-86400))
+            db.execute(delete(Rate).where(Rate.expires<now()));db.execute(delete(UsedRefresh).where(UsedRefresh.expires<now()));db.execute(delete(Token).where(Token.expires<now()-86400));db.execute(delete(ProjectInvitation).where(ProjectInvitation.expires<=now()))
             db.execute(delete(Audit).where(Audit.created<now()-90*86400));db.execute(delete(Mail).where(Mail.sent==True));print('Expired operational records removed; financial records preserved.')
 
 if __name__=='__main__':main()
