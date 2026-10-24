@@ -4,7 +4,6 @@ from urllib.parse import urlencode
 import httpx, pyotp
 from fastapi import FastAPI, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from starlette.concurrency import run_in_threadpool
@@ -17,6 +16,7 @@ from api.security import *
 from api.billing import StripeGateway, process_event, sync_subscription
 from api.project_data import project_data
 from api.middleware import BodyLimitMiddleware
+from api.static_files import PublicFrontend
 
 class Input(BaseModel):model_config=ConfigDict(extra='forbid')
 class Signup(Input):
@@ -143,9 +143,9 @@ def create_app(settings=None,gateway=None):
             if user.totp:return login_result(db,user,request,response)
             pending=db.scalar(select(Token).where(Token.user_id==user.id,Token.purpose=='confirm-login',Token.used==False,Token.expires>now()))
             if not pending:
-                raw=action_token(db,user,'confirm-login',600,str(user.epoch))
-                notify(db,s,user,'Confirm your Studio sign-in','Someone entered your correct password after unsuccessful attempts. Only continue if you are signing in. This link opens a session in the browser where you confirm it and expires in 10 minutes: '+s.origin+'/#/confirm-login?token='+raw)
-            return {'confirmation_required':True,'message':'Check your email to confirm this sign-in. The link expires in 10 minutes; existing valid links are not replaced. You can also reset your password.'}
+                raw=action_token(db,user,'confirm-login',s.login_confirmation_ttl,str(user.epoch))
+                notify(db,s,user,'Confirm your Studio sign-in','Someone entered your correct password after unsuccessful attempts. Only continue if you are signing in. This link opens a session in the browser where you confirm it. Use it within '+str(s.login_confirmation_ttl//60)+' minutes of your request: '+s.origin+'/#/confirm-login?token='+raw)
+            return {'confirmation_required':True,'message':'Check your email to confirm this sign-in. Links expire '+str(s.login_confirmation_ttl//60)+' minutes after they are requested; requesting again does not replace an unexpired link. If mail is delayed, use your enabled authenticator or password recovery and contact support.'}
         user.failures=0;user.locked_until=0
         if passwords.check_needs_rehash(user.password):user.password=passwords.hash(body.password)
         return login_result(db,user,request,response)
@@ -403,7 +403,7 @@ def create_app(settings=None,gateway=None):
     install_ai_modelling(app,auth,db_session)
     install_collaboration(app,auth,db_session)
     # Static mount is last. The standalone API can serve this same frontend under one origin.
-    app.mount('/',StaticFiles(directory=Path(__file__).resolve().parent.parent/'dist',html=True),name='frontend')
+    app.mount('/',PublicFrontend(directory=Path(__file__).resolve().parent.parent/'dist',html=True),name='frontend')
     return app
 
 def run_app():return create_app()

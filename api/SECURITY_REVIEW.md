@@ -2,6 +2,8 @@
 
 ## Current follow-up
 
+The latest [residual-risk review](RESIDUAL_RISK_REVIEW.md) covers v15.2 resource recovery, local privacy controls, public-file guards and configurable login-link expiry.
+
 See [the submitted threat-report audit](THREAT_REPORT_AUDIT.md) for the v15.1 fixes and current verification. Historical test counts below describe the original milestone.
 
 ## Review result

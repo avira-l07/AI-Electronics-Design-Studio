@@ -1489,7 +1489,7 @@ ${assemblyGuide()}<div class="editor3d" id="editor3d" data-mobile-panel="parts">
       pauseEditor();
       const loading=document.getElementById('v3dLoad');
       if(document.getElementById('downloadLegacy3d'))return;
-      if(loading&&ticket===entrySequence){loading.style.display='flex';loading.innerHTML='<h3>Unable to open the 3D workspace</h3><p id="v3dError" role="alert"></p><button id="retry3dBtn">Retry 3D workspace</button>';document.getElementById('v3dError').textContent=error.message;document.getElementById('retry3dBtn').onclick=enterEditor;}
+      if(loading&&ticket===entrySequence){loading.style.display='flex';loading.innerHTML='<h3>Unable to open the 3D workspace</h3><p id="v3dError" role="alert"></p><button id="retry3dBtn">Retry 3D workspace</button><button id="exportBlocked3d">Export unchanged project JSON</button>';document.getElementById('v3dError').textContent=error.message;document.getElementById('retry3dBtn').onclick=enterEditor;document.getElementById('exportBlocked3d').onclick=()=>_download('unavailable-3d-project.json',JSON.stringify(current,null,2),'application/json');}
     }
   }
   function registerAndRender(){

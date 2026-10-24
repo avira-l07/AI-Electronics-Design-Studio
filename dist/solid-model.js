@@ -1,7 +1,15 @@
 /* Portable modelling recipe. No user scripts or serialized executable geometry. */
 const StudioSolidModel=(()=>{
   let kernel=null,promise=null,worker=null,workerReady=null,request=0;
-  const pending=new Map(),cache=new Map();
+  const pending=new Map(),cache=new Map(),preparing=new Map();let cacheBytes=0;
+  const CACHE_BYTES=32*1024*1024;
+  const resultBytes=value=>(value.positions?.byteLength||0)+(value.indices?.byteLength||0);
+  function remember(key,result){
+    const bytes=resultBytes(result);if(bytes>CACHE_BYTES)throw Error('The solid exceeds the preview memory budget. Simplify its features.');
+    if(cache.has(key)){cacheBytes-=resultBytes(cache.get(key));cache.delete(key);}
+    while(cache.size&&(cacheBytes+bytes>CACHE_BYTES||cache.size>=256)){const oldest=cache.keys().next().value;cacheBytes-=resultBytes(cache.get(oldest));cache.delete(oldest);}
+    cache.set(key,result);cacheBytes+=bytes;
+  }
   const obj=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
   const exact=(v,keys)=>obj(v)&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k));
   const number=(v,max=5000)=>typeof v==='number'&&Number.isFinite(v)&&Math.abs(v)<=max;
@@ -69,9 +77,14 @@ const StudioSolidModel=(()=>{
     if(!validate(model,depth))throw Error('Invalid solid recipe.');
     if(kernel)return;
     const key=recipeKey(model,depth);if(cache.has(key))return;
-    await init();const id=++request;
-    const result=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{worker?.terminate();worker=null;workerReady=null;for(const p of pending.values()){clearTimeout(p.timer);p.reject(Error('Model rebuild exceeded 20 seconds. Simplify the profile or features.'));}pending.clear();},20000);pending.set(id,{resolve,reject,timer});worker.postMessage({id,model,depth});});
-    if(cache.size>=256)cache.delete(cache.keys().next().value);cache.set(key,result);
+    if(preparing.has(key))return preparing.get(key);
+    const task=(async()=>{
+      await init();const id=++request;
+      if(pending.size>=8)throw Error('Too many solid rebuilds are queued. Wait for the active previews.');
+      const result=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{worker?.terminate();worker=null;workerReady=null;for(const p of pending.values()){clearTimeout(p.timer);p.reject(Error('Model rebuild exceeded 20 seconds. Simplify the profile or features.'));}pending.clear();},20000);pending.set(id,{resolve,reject,timer});try{worker.postMessage({id,model,depth});}catch(error){pending.delete(id);clearTimeout(timer);reject(error);}});
+      remember(key,result);
+    })();preparing.set(key,task);
+    try{await task;}finally{if(preparing.get(key)===task)preparing.delete(key);}
   }
   function evaluate(model,depth){
     if(!validate(model,depth))throw Error('Invalid solid recipe. Check the outline, dimensions and feature limits.');

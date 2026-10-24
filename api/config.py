@@ -25,6 +25,7 @@ class Settings:
     smtp_user: str = os.getenv('SMTP_USER', '')
     smtp_password: str = os.getenv('SMTP_PASSWORD', '')
     mail_from: str = os.getenv('MAIL_FROM', '')
+    login_confirmation_ttl: int = int(os.getenv('LOGIN_CONFIRMATION_TTL_SECONDS', '1200'))
     ai_key: str = os.getenv('OPENAI_API_KEY', '')
     ai_model: str = os.getenv('OPENAI_MODEL', '')
     ai_enabled: bool = os.getenv('AI_ENABLED', 'false').lower() == 'true'
@@ -49,6 +50,8 @@ class Settings:
                 raise RuntimeError('Production requires SMTP delivery for verification and recovery.')
         if not 0 <= self.trial_days <= 30:
             raise RuntimeError('TRIAL_DAYS must be between 0 and 30.')
+        if type(self.login_confirmation_ttl)!=int or not 600<=self.login_confirmation_ttl<=1800:
+            raise RuntimeError('LOGIN_CONFIRMATION_TTL_SECONDS must be between 600 and 1800 seconds.')
         if self.billing_enabled and self.environment!='test':
             if not self.stripe_key.startswith(('sk_test_','sk_live_')) or not self.webhook_key.startswith('whsec_') or not all(p.startswith('price_') for p in [self.monthly_price,self.annual_price]) or self.monthly_price==self.annual_price:
                 raise RuntimeError('Billing requires a Stripe secret, webhook signing secret and distinct monthly/annual price IDs.')

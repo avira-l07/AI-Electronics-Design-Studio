@@ -1,5 +1,7 @@
 # Secure API and frontend integration
 
+Follow-up v15.2: [residual-risk review](RESIDUAL_RISK_REVIEW.md). Sign-in confirmations default to 20 minutes; configure `LOGIN_CONFIRMATION_TTL_SECONDS` within 600–1800 seconds. Delivery and provider activation remain unverified until deployment.
+
 Latest security changes and migration 0005: [submitted threat-report audit](THREAT_REPORT_AUDIT.md). Apply `python -m api.migrate` before starting the upgraded backend. The owner has held cloud deployment pending host/domain details.
 
 This is a runnable implementation and review baseline, not a security certification. The published Sites origin remains a static frontend preview with its existing access policy. Python, PostgreSQL, SMTP, Google and Stripe are not provisioned by uploading static files.

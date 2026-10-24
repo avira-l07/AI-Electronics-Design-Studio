@@ -39,6 +39,8 @@ function backupCenter(){
   $('#modalForm>button[type=submit]').style.display='none';
   $('#exportFullBackup').onclick=async()=>{try{if(server)download('studio-account-export.json',JSON.stringify(await studioBackend.request('/account/export'),null,2),'application/json');else exportStudioBackup()}catch(e){$('#backupStatus').textContent=e.message}};
   if(server)return;
+  $('#backupStatus').insertAdjacentHTML('afterend','<section class="recoverySection"><h3>Shared computer privacy</h3><p>Ending a preview session does not remove saved designs. Export your projects before clearing this browser profile.</p><button type="button" id="openDevicePrivacy">Clear Studio data from this browser</button></section>');
+  $('#openDevicePrivacy').onclick=()=>StudioDevicePrivacy.open();
   $('#chooseStudioBackup').onclick=()=>$('#restoreStudioBackup').click();
   if($('#exportRecoveryData'))$('#exportRecoveryData').onclick=()=>download('studio-original-storage.json',JSON.stringify([...studioStorage.problems].map(([key,value])=>({key,...value})),null,2),'application/json');
   if($('#recoverLocalProjects'))$('#recoverLocalProjects').onclick=()=>{try{

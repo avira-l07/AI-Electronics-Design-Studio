@@ -1,5 +1,7 @@
 # AI Engineering Design Studio
 
+Current follow-up v15.2: [residual-risk review](api/RESIDUAL_RISK_REVIEW.md). Adds deliberate device-data removal, bounded CAD cache/queue and shared preview recovery, configurable sign-in confirmation lifetime and public-file guards. Backend deployment remains held.
+
 Current security follow-up v15.1: [submitted threat-report audit](api/THREAT_REPORT_AUDIT.md). Adds private pending invitations, owner sign-in recovery during lockout, explicit local-data notices and regression tests. Backend deployment remains held.
 
 Current v15 appearance: [color combinations and effects](V15_COLOR_AND_EFFECTS.md). Shared evergreen/ivory/graphite and cobalt palettes, consistent light/dark editing panels, readable labels, restrained hover/dialog effects and reduced-motion support.

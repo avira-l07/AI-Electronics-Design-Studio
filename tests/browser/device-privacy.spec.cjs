@@ -1,0 +1,11 @@
+const {test,expect}=require('@playwright/test');
+async function openClear(page){await page.goto('/#/library');await page.getByRole('button',{name:'Backups',exact:true}).click();await page.locator('#openDevicePrivacy').click();}
+test('device removal is explicit, scoped, and reloads another preview tab',async({page,context})=>{
+ await page.goto('/#/dashboard');await page.evaluate(()=>{localStorage.setItem('studio-personal-parts-v1','[]');localStorage.setItem('studio-original-private-review','secret recovery example');localStorage.setItem('studio-profile-v1',JSON.stringify({name:'Private local profile',email:'private@example.com'}));localStorage.setItem('unrelated-key','keep');sessionStorage.setItem('studio-demo-session','active');});
+ const other=await context.newPage();await other.goto('/#/dashboard');
+ await openClear(page);await expect(page.locator('#modalTitle')).toHaveText('Clear Studio data from this browser');await page.locator('#closeDialog').click();expect(await page.evaluate(()=>localStorage.getItem('studio-original-private-review'))).toBe('secret recovery example');
+ await openClear(page);const download=page.waitForEvent('download');await page.locator('#exportDeviceArchive').click();const archive=JSON.parse(require('node:fs').readFileSync(await(await download).path(),'utf8'));expect(archive.entries.some(r=>r.key==='studio-original-private-review')).toBe(true);expect(archive.entries.some(r=>r.key==='unrelated-key')).toBe(false);
+ await page.locator('#clearDeviceConfirm').fill('CLEAR');await page.locator('#clearDeviceAcknowledged').check();await page.locator('#modalForm>button[type=submit]').click();await expect(page).toHaveURL(/#\/landing$/);await expect(other).toHaveURL(/#\/landing$/);
+ expect(await page.evaluate(()=>({projects:localStorage.getItem('engineering-studio-v1'),parts:localStorage.getItem('studio-personal-parts-v1'),profile:localStorage.getItem('studio-profile-v1'),recovery:localStorage.getItem('studio-original-private-review'),unrelated:localStorage.getItem('unrelated-key'),session:sessionStorage.getItem('studio-demo-session')}))).toEqual({projects:'[]',parts:null,profile:null,recovery:null,unrelated:'keep',session:null});
+ await other.close();
+});
