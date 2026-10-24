@@ -44,6 +44,12 @@ def create_app(settings=None,gateway=None):
     s=settings or Settings();s.validate();engine,Factory=database(s.database_url)
     app=FastAPI(title='Engineering Studio API',docs_url='/api/docs' if s.environment!='production' else None,redoc_url=None,openapi_url='/api/openapi.json' if s.environment!='production' else None)
     app.state.settings=s;app.state.engine=engine;app.state.Factory=Factory;app.state.gateway=gateway or StripeGateway(s)
+    if s.free_beta:
+        from api.middleware import FreeBetaCapacity
+        app.add_middleware(FreeBetaCapacity)
+    if s.inline_mail:
+        from api.mail_delivery import RequestOutbox
+        app.add_middleware(RequestOutbox,factory=Factory,settings=s)
     app.add_middleware(CORSMiddleware,allow_origins=[s.origin],allow_credentials=True,allow_methods=['GET','POST','PATCH','DELETE'],allow_headers=['Content-Type','X-CSRF-Token'])
     from urllib.parse import urlparse
     app.add_middleware(TrustedHostMiddleware,allowed_hosts=[urlparse(s.origin).hostname,'testserver'] if s.environment=='test' else [urlparse(s.origin).hostname])
@@ -103,7 +109,7 @@ def create_app(settings=None,gateway=None):
         return {'id':user.id,'name':user.name,'email':user.email,'role':user.role,'plan':plan.id,'profile_limit':plan.profile_limit,'active_profile':session.profile_id,'mfa_enabled':bool(user.totp),'profiles':[{'id':p.id,'name':p.name,'bio':p.bio,'available':p.id in eligible} for p in profiles]}
 
     @app.get('/api/config')
-    def config():return {'mode':'server','google_enabled':bool(s.google_client and s.google_secret),'payments_enabled':bool(s.billing_enabled and s.stripe_key and s.webhook_key and s.monthly_price and s.annual_price),'trial_days':s.trial_days,'ai_enabled':bool(s.ai_enabled and s.ai_key and s.ai_model),'sharing_enabled':s.sharing_enabled}
+    def config():return {'mode':'server','free_beta':s.free_beta,'demo_mode':bool(getattr(app.state,'local_demo',False)),'google_enabled':bool(s.google_client and s.google_secret),'payments_enabled':bool(s.billing_enabled and s.stripe_key and s.webhook_key and s.monthly_price and s.annual_price),'trial_days':s.trial_days,'ai_enabled':s.ai_ready,'ai_provider':s.ai_provider if s.ai_ready else None,'sharing_enabled':s.sharing_enabled}
     @app.get('/api/csrf')
     def csrf(request:Request,response:Response):return {'token':issue_csrf(s,response,csrf_binding(s,request))}
     @app.post('/api/auth/signup',status_code=202)
@@ -116,9 +122,10 @@ def create_app(settings=None,gateway=None):
         return {'message':'If this address is eligible, a verification email will arrive.'}
     @app.post('/api/auth/verify')
     def verify(body:TokenInput,request:Request,db=Depends(db_session)):
-        rate(db,request,'verify',20);token=consume_token(db,body.token,'verify');user=locked_user(db,token.user_id)
+        rate(db,request,'verify',20);user,token=account_token(db,body.token,'verify')
+        if not token or token.used or token.expires<=now():fail(400,'Token expired or invalid')
         if not user or user.deleted:fail(400,'Token expired or invalid')
-        user.verified=True;audit(db,user,'email.verified',request,s);return {'verified':True}
+        token.used=True;user.verified=True;audit(db,user,'email.verified',request,s);return {'verified':True}
     @app.post('/api/auth/resend',status_code=202)
     def resend(body:EmailInput,request:Request,db=Depends(db_session)):
         rate(db,request,'resend',5);user=db.scalar(select(User).where(User.email==str(body.email).lower()))
@@ -153,17 +160,15 @@ def create_app(settings=None,gateway=None):
     def confirm_login(body:TokenInput,request:Request,response:Response,db=Depends(db_session)):
         # Lock the account before its token, matching session revocation/reset.
         # Read only the ID initially, avoiding a stale cached Token on a retry.
-        user_id=db.scalar(select(Token.user_id).where(Token.digest==digest(body.token),Token.purpose=='confirm-login'))
-        if not user_id:fail(400,'Sign-in confirmation expired or invalid')
-        user=locked_user(db,user_id);token=consume_token(db,body.token,'confirm-login')
-        if not user or user.deleted or user.banned or not user.verified or token.data!=str(user.epoch):fail(400,'Sign-in confirmation expired or invalid')
+        user,token=account_token(db,body.token,'confirm-login')
+        if not token or token.used or token.expires<=now() or not user or user.deleted or user.banned or not user.verified or token.data!=str(user.epoch):fail(400,'Sign-in confirmation expired or invalid')
+        token.used=True
         user.failures=0;user.locked_until=0;audit(db,user,'login.email_confirmed',request,s)
         return login_result(db,user,request,response)
     @app.post('/api/auth/mfa')
     def finish_mfa(body:OTPInput,request:Request,response:Response,db=Depends(db_session)):
-        rate(db,request,'mfa',10);token=db.scalar(select(Token).where(Token.digest==digest(body.token),Token.purpose=='mfa').with_for_update())
+        rate(db,request,'mfa',10);user,token=account_token(db,body.token,'mfa')
         if not token or token.used or token.expires<=now():fail(401,'Challenge expired')
-        user=locked_user(db,token.user_id)
         if not user or user.banned or user.deleted or not user.verified or not check_otp(s,user,body.code):
             token.attempts+=1
             if token.attempts>=5:token.used=True
@@ -199,8 +204,10 @@ def create_app(settings=None,gateway=None):
         return {'message':'If eligible, a reset email will arrive.'}
     @app.post('/api/auth/reset')
     def reset(body:Reset,request:Request,response:Response,db=Depends(db_session)):
-        rate(db,request,'reset',10);token=consume_token(db,body.token,'reset');user=locked_user(db,token.user_id)
+        rate(db,request,'reset',10);user,token=account_token(db,body.token,'reset')
+        if not token or token.used or token.expires<=now():fail(400,'Token expired or invalid')
         if not user or user.deleted:fail(400,'Token expired or invalid')
+        token.used=True
         user.password=passwords.hash(body.password);user.failures=0;user.locked_until=0;revoke_all(db,user)
         db.execute(update(Token).where(Token.user_id==user.id,Token.purpose.in_(['reset','mfa'])).values(used=True));clear_auth(s,response);audit(db,user,'password.reset',request,s);notify(db,s,user,'Your password changed','All sessions were revoked. If this was not you, contact support.');return {'reset':True}
     @app.get('/api/me')
@@ -304,10 +311,12 @@ def create_app(settings=None,gateway=None):
         return {'url':obj['url']}
     @app.post('/api/payments/portal')
     def portal(who=Depends(auth)):
+        if not s.billing_enabled:fail(503,'Paid billing has not been launched')
         if not who[0].customer:fail(400,'No billing account yet')
         return {'url':app.state.gateway.portal(who[0].customer)}
     @app.post('/api/payments/cancel')
     def cancel(who=Depends(auth),db=Depends(db_session)):
+        if not s.billing_enabled:fail(503,'Paid billing has not been launched')
         user,_=who;rows=list(db.scalars(select(Subscription).where(Subscription.user_id==user.id,Subscription.status.in_(['active','trialing','past_due']))))
         for row in rows:app.state.gateway.cancel(row.id);sync_subscription(db,s,app.state.gateway,user,row.id)
         audit(db,user,'subscription.cancel_requested');return {'cancel_at_period_end':True}
@@ -357,7 +366,10 @@ def create_app(settings=None,gateway=None):
         rate(db,request,'delete-account',5);user,session=who;recent(user,session)
         reauthenticate(user,body) if user.password else (None if check_otp(s,user,body.code) else fail(403,'Enable and verify a second factor before deleting a Google-only account'))
         # If provider cancellation fails, the transaction aborts; never leave a deleted user renewing silently.
-        for sub in db.scalars(select(Subscription).where(Subscription.user_id==user.id,Subscription.status.not_in(['canceled','incomplete_expired']))):app.state.gateway.cancel(sub.id,immediate=True);sub.status='canceled';sub.ends=now()
+        for sub in db.scalars(select(Subscription).where(Subscription.user_id==user.id,Subscription.status.not_in(['canceled','incomplete_expired']))):
+            from api.beta_access import BETA_PRICE
+            if not (sub.id.startswith('beta_') and sub.price==BETA_PRICE):app.state.gateway.cancel(sub.id,immediate=True)
+            sub.status='canceled';sub.ends=now()
         revoke_all(db,user);db.execute(delete(ProjectInvitation).where(ProjectInvitation.email==user.email));db.execute(delete(ProjectPresence).where(ProjectPresence.user_id==user.id));db.execute(delete(ProjectComment).where(ProjectComment.user_id==user.id));db.execute(delete(ProjectMember).where(ProjectMember.user_id==user.id));db.execute(delete(Token).where(Token.user_id==user.id));db.execute(delete(Notice).where(Notice.user_id==user.id));db.execute(delete(Mail).where(Mail.user_id==user.id));db.execute(delete(Project).where(Project.user_id==user.id));db.execute(delete(Profile).where(Profile.user_id==user.id))
         user.deleted=True;user.email='deleted-'+user.id+'@invalid.example';user.name='Deleted account';user.password=None;user.google_sub=None;user.totp=None;user.totp_pending=None;user.recovery='[]';user.checkout_url=None
         audit(db,user,'account.deleted',request,s);clear_auth(s,response);return {'deleted':True,'retained':'Pseudonymous payment and audit records are retained under the deployment retention policy.'}

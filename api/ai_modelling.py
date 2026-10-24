@@ -36,10 +36,10 @@ def install_ai_modelling(app,auth,db_session):
         row=db.scalar(select(Project).where(Project.id==id,Project.user_id==user.id,Project.profile_id==session.profile_id,Project.trashed==False))
         if not row:fail(404,'Project not found')
         if row.version!=body.version:fail(409,'Project changed. Reload before requesting another proposal.')
-        if not s.ai_enabled or not s.ai_key or not s.ai_model:fail(503,'AI modelling is not configured.')
+        if not s.ai_ready:fail(503,'AI modelling is not configured.')
         # Commit quota before the remote request so failures cannot bypass cost controls.
         limit(db,'ai-model:'+user.id,5,3600);audit(db,user,'ai.model.requested');db.commit()
         text=ask_provider(s,body.prompt,schema=SCHEMA)
         try:proposal=recipe(json.loads(text))
         except (ValueError,TypeError,KeyError):fail(502,'AI returned an invalid proposal. No project was changed.')
-        return {'proposal':proposal,'project_version':body.version,'applied':False,'provider':s.ai_model}
+        return {'proposal':proposal,'project_version':body.version,'applied':False,'provider':s.selected_ai_model}

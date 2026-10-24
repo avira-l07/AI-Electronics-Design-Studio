@@ -78,7 +78,11 @@ def principal(db,settings,request):
     if not user or not session or session.user_id!=user.id or session.revoked or session.expires<=now() or user.epoch!=claims['ver'] or user.banned or user.deleted or not user.verified:fail()
     return user,session
 def effective_plan(db,settings,user):
-    paid=db.scalar(select(Subscription).where(Subscription.user_id==user.id,Subscription.status.in_(['active','trialing']),Subscription.ends>now(),Subscription.disputed==False,Subscription.refunded_invoice.is_(None),Subscription.price.in_([p for p in [settings.monthly_price,settings.annual_price] if p])))
+    prices=[p for p in [settings.monthly_price,settings.annual_price] if p]
+    if settings.free_beta:
+        from api.beta_access import BETA_PRICE
+        prices.append(BETA_PRICE)
+    paid=db.scalar(select(Subscription).where(Subscription.user_id==user.id,Subscription.status.in_(['active','trialing']),Subscription.ends>now(),Subscription.disputed==False,Subscription.refunded_invoice.is_(None),Subscription.price.in_(prices)))
     return db.get(Plan,'premium' if paid else 'free')
 def allowed_profiles(db,settings,user):
     return list(db.scalars(select(Profile).where(Profile.user_id==user.id).order_by(Profile.created,Profile.id).limit(effective_plan(db,settings,user).profile_limit)))
@@ -92,9 +96,22 @@ def require_admin(user):
 def action_token(db,user,purpose,ttl=1800,data=''):
     raw=random_token();db.add(Token(digest=digest(raw),user_id=user.id if user else None,purpose=purpose,expires=now()+ttl,data=data));return raw
 def consume_token(db,raw,purpose):
-    token=db.scalar(select(Token).where(Token.digest==digest(raw),Token.purpose==purpose).with_for_update())
+    token=db.scalar(select(Token).where(Token.digest==digest(raw),Token.purpose==purpose).with_for_update().execution_options(populate_existing=True))
     if not token or token.used or token.expires<=now():fail(400,'Token expired or invalid')
     token.used=True;return token
+
+def account_token(db,raw,purpose):
+    """Lock account before token, matching principal/revocation lock order.
+
+    Read only the ID first. Refresh the token after waiting, so a concurrent
+    reset/revocation cannot leave a stale usable token in the identity map.
+    The caller checks expiry/used and consumes only after its factor succeeds.
+    """
+    user_id=db.scalar(select(Token.user_id).where(Token.digest==digest(raw),Token.purpose==purpose))
+    if not user_id:return None,None
+    user=db.scalar(select(User).where(User.id==user_id).with_for_update().execution_options(populate_existing=True))
+    token=db.scalar(select(Token).where(Token.digest==digest(raw),Token.purpose==purpose).with_for_update().execution_options(populate_existing=True))
+    return user,token
 def revoke_all(db,user):
     user.epoch+=1;db.execute(update(Session).where(Session.user_id==user.id).values(revoked=True))
     db.execute(update(Token).where(Token.user_id==user.id,Token.purpose.in_(['mfa','confirm-login'])).values(used=True))

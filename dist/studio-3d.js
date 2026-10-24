@@ -457,7 +457,26 @@ ${assemblyGuide()}<div class="editor3d" id="editor3d" data-mobile-panel="parts">
     object.traverse(c=>{if(c.geometry)geometries.add(c.geometry);if(c.material)(Array.isArray(c.material)?c.material:[c.material]).forEach(m=>materials.add(m));});
     geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());
   }
-  function loadScene(){
+  function clonePartMesh(source){
+    const copy=source.clone(true);copy.traverse(node=>{if(node.geometry)node.geometry=node.geometry.clone();if(node.material)node.material=Array.isArray(node.material)?node.material.map(m=>m.clone()):node.material.clone();});return copy;
+  }
+  function solidIdentity(def){return def.model?JSON.stringify([def.id,def.dims,def.model,def.mat]):null;}
+  async function loadPreparedScene(ticket,project){
+    const prepared=new Map(),snapshot=JSON.stringify(current.assembly3d);
+    try{
+      for(const part of current.assembly3d?.objects||[]){
+        if(!part.model)continue;
+        await StudioSolidModel.prepare(part.model,part.dims.depth);
+        if(ticket!==entrySequence||project!==current?.id||!isActive()||JSON.stringify(current.assembly3d)!==snapshot)return false;
+        // Consume each result before the next recipe can evict it from cache.
+        const mesh=build({...structuredClone(ALL_PARTS.find(p=>p.id===part.partId)),dims:structuredClone(part.dims),model:structuredClone(part.model),mat:part.material,col:MAT_COLORS[part.material]});
+        prepared.set(part.id,mesh);
+      }
+      if(ticket!==entrySequence||project!==current?.id||!isActive()||JSON.stringify(current.assembly3d)!==snapshot)return false;
+      loadScene(prepared);return true;
+    }finally{for(const mesh of prepared.values())disposeObject(mesh);}
+  }
+  function loadScene(prepared=null){
     if(!current?.id||!scene)return;
     sceneBlocked=false;let data=current.assembly3d||{version:1,units:'mm',objects:[]};
     let migrated=false;
@@ -478,7 +497,8 @@ ${assemblyGuide()}<div class="editor3d" id="editor3d" data-mobile-panel="parts">
     const next=[];
     try{for(const item of data.objects){
       const base=ALL_PARTS.find(p=>p.id===item.partId)||{id:'imported_mesh',name:'Imported mesh',icon:'enclosure'},def={...structuredClone(base),dims:structuredClone(item.dims),...(item.model?{model:structuredClone(item.model)}:{}),...(item.mesh?{mesh:structuredClone(item.mesh)}:{}),mat:item.material,col:MAT_COLORS[item.material]};
-      const obj3d=build(def);obj3d.position.fromArray(item.position.map(v=>v/10));obj3d.rotation.set(...item.rotation.map(v=>v*Math.PI/180));
+      const identity=solidIdentity(def),existing=identity&&objects.find(o=>solidIdentity(o.def)===identity);
+      const obj3d=prepared?.get(item.id)||(existing?clonePartMesh(existing.obj3d):build(def));prepared?.delete(item.id);obj3d.position.fromArray(item.position.map(v=>v/10));obj3d.rotation.set(...item.rotation.map(v=>v*Math.PI/180));
       const record={id:item.id,name:item.name,def,obj3d,visible:item.visible,wireframe:item.wireframe};applyRecordAppearance(record);next.push(record);
     }}catch(error){next.forEach(o=>disposeObject(o.obj3d));throw error;}
     clearSceneObjects();objects=next;assemblyGroups=structuredClone(data.groups||[]);assemblyJoints=structuredClone(data.joints||[]);objects.forEach(o=>scene.add(o.obj3d));loadedProjectId=current.id;loadedSignature=signature;
@@ -592,11 +612,8 @@ ${assemblyGuide()}<div class="editor3d" id="editor3d" data-mobile-panel="parts">
 
     observeViewport(vp);
 
-    const loadEl = document.getElementById('v3dLoad');
-    if (loadEl) loadEl.style.display = 'none';
-
     editorReady = true;
-    loadScene();
+    // enterEditor loads prepared geometry after scene initialization.
     updateEmpty();
     refreshAsm();
     refreshBom();
@@ -1474,11 +1491,11 @@ ${assemblyGuide()}<div class="editor3d" id="editor3d" data-mobile-panel="parts">
     const ticket=++entrySequence,project=current?.id;
     try{
       await ensureThree();
-      if(current.assembly3d?.objects.some(o=>o.partId==='custom_solid')){await ensureSolids();for(const part of current.assembly3d.objects)if(part.model)await StudioSolidModel.prepare(part.model,part.dims.depth);}
+      const hasSolids=current.assembly3d?.objects.some(o=>o.model);if(hasSolids)await ensureSolids();
       if(ticket!==entrySequence||project!==current?.id||!isActive())return;
       const changed=!editorReady||!renderer||loadedProjectId!==current.id;
       if(!editorReady||!renderer)initScene();else attachCanvas();
-      loadScene();
+      if(hasSolids){if(!await loadPreparedScene(ticket,project))return;}else loadScene();
       const vp=document.getElementById('vp3d');observeViewport(vp);
       camera.aspect=Math.max(1,vp.clientWidth)/Math.max(1,vp.clientHeight);camera.updateProjectionMatrix();renderer.setSize(Math.max(1,vp.clientWidth),Math.max(1,vp.clientHeight),false);
       if(changed)fitAssembly();

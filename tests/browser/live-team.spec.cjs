@@ -2,6 +2,27 @@ const {test:base,expect}=require('@playwright/test'),{spawn}=require('node:child
 const test=base.extend({liveOrigin:[async({},use)=>{const port=await new Promise(resolve=>{const server=net.createServer();server.listen(0,'127.0.0.1',()=>{const port=server.address().port;server.close(()=>resolve(port));});}),dir=fs.mkdtempSync(path.join(os.tmpdir(),'studio-team-')),python=process.env.STUDIO_PYTHON||(process.platform==='win32'?'.venv/Scripts/python.exe':'python'),child=spawn(python,['tests/live-server.py',String(port),dir],{cwd:path.resolve('.'),stdio:['ignore','pipe','pipe'],windowsHide:true}),origin='http://127.0.0.1:'+port;let logs='';child.stdout.on('data',v=>logs+=v);child.stderr.on('data',v=>logs+=v);try{await expect.poll(async()=>{if(child.exitCode!==null)throw Error(logs);try{return (await fetch(origin+'/api/config')).status;}catch{return 0;}},{timeout:30000}).toBe(200);await use(origin);}finally{if(logs.includes('ERROR'))process.stderr.write(logs);child.kill();await new Promise(resolve=>{if(child.exitCode!==null)return resolve();child.once('exit',resolve);});}}, {scope:'worker'}]});
 async function send(context,origin,url,method='POST',data={}){const token=(await(await context.request.get(origin+'/api/csrf')).json()).token;return context.request.fetch(origin+'/api'+url,{method,data,headers:{Origin:origin,'X-CSRF-Token':token}});}
 async function account(browser,origin,name,viewport){const context=await browser.newContext({viewport}),page=await context.newPage();await page.goto(origin+'/#/login');await page.locator('#secureEmail').fill(name+'@example.com');await page.locator('#securePassword').fill('Synthetic test password 739!');await page.locator('#secureAuth button[type=submit]').click();await expect(page.locator('[data-team-inbox]')).toBeVisible();return {context,page};}
+
+test('free-beta account screens disclose no charging and expiring complimentary access',async({browser,liveOrigin},info)=>{
+ const context=await browser.newContext({viewport:info.project.use.viewport});
+ try{
+  await context.route(liveOrigin+'/api/config',async route=>{const response=await route.fetch();await route.fulfill({response,json:{...await response.json(),free_beta:true,payments_enabled:false}});});
+  const page=await context.newPage();await page.goto(liveOrigin+'/#/login');await page.locator('#secureEmail').fill('owner@example.com');await page.locator('#securePassword').fill('Synthetic test password 739!');await page.locator('#secureAuth button[type=submit]').click();
+  await expect(page.locator('.modeBadge')).toHaveText('FREE BETA · NO CHARGES');await expect(page.locator('.freeBetaNotice')).toContainText('no payments are collected');await expect(page.locator('.freeBetaNotice')).toContainText('expires automatically');
+  await page.goto(liveOrigin+'/#/confirmation');await expect(page.locator('.confirmationMain')).toContainText('No payment was collected.');await expect(page.locator('.confirmationMain')).not.toContainText('confirmed your access with Stripe');
+ }finally{await context.close();}
+});
+
+test('local AI disclosure identifies Ollama without claiming a cloud request',async({browser,liveOrigin},info)=>{
+ const context=await browser.newContext({viewport:info.project.use.viewport});
+ try{
+  await context.route(liveOrigin+'/api/config',async route=>{const response=await route.fetch();await route.fulfill({response,json:{...await response.json(),free_beta:true,demo_mode:true,ai_enabled:true,ai_provider:'ollama',payments_enabled:false}});});
+  const page=await context.newPage();await page.goto(liveOrigin+'/#/login');await page.locator('#secureEmail').fill('owner@example.com');await page.locator('#securePassword').fill('Synthetic test password 739!');await page.locator('#secureAuth button[type=submit]').click();
+  await expect(page.locator('.freeBetaNotice')).toContainText('Optional AI runs on this computer');
+  await page.goto(liveOrigin+'/#/workspace?tool=3d');await expect(page.locator('#v3dLoad')).toBeHidden();await page.locator('#projectServices').click();
+  await expect(page.locator('#modalFields')).toContainText('Ollama model running on this computer');await expect(page.locator('#modalFields')).toContainText('No cloud fallback');await expect(page.locator('#requestModelProposal')).toBeEnabled();
+ }finally{await context.close();}
+});
 test('shared geometry failure keeps project data and healthy parts available, then recovers on retry',async({browser,liveOrigin},info)=>{
  const owner=await account(browser,liveOrigin,'owner',info.project.use.viewport),page=owner.page;let createdId;
  try{

@@ -10,7 +10,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
  vm.runInContext(fs.readFileSync('dist/drone-template.js','utf8'),ctx);
  vm.runInContext(fs.readFileSync('dist/project-format.js','utf8'),ctx);
  const src=fs.readFileSync('dist/studio-3d.js','utf8');
- vm.runInContext(src.replace(/\}\)\(\);\s*$/,"globalThis.engine={build,sceneData,loadScene,saveScene,place,dupSelected,delSelected,clearAll,syncBOM,toggleExplode,extrude2DSketch,exportSTL,exportOBJ,bindEditor,setCam,select,setAssemblyStage,get:()=>({objects,loadedProjectId,exploded}),setup:()=>{scene=new window.THREE.Scene();camera=new window.THREE.PerspectiveCamera();editorReady=true;},setObjects:value=>{objects=value}};})();"),ctx);
+ vm.runInContext(src.replace(/\}\)\(\);\s*$/,"globalThis.engine={build,sceneData,loadScene,loadPreparedScene:()=>loadPreparedScene(entrySequence,current.id),saveScene,place,dupSelected,delSelected,clearAll,syncBOM,toggleExplode,extrude2DSketch,exportSTL,exportOBJ,bindEditor,setCam,select,setAssemblyStage,get:()=>({objects,loadedProjectId,exploded}),setup:()=>{scene=new window.THREE.Scene();camera=new window.THREE.PerspectiveCamera();editorReady=true;},setObjects:value=>{objects=value}};})();"),ctx);
  const model=vm.runInContext('StudioAssembly',ctx),engine=ctx.engine;
  engine.setup();engine.loadScene();
  function rec(partId,id='item'){const p=structuredClone(model.parts.find(p=>p.id===partId));return{id,name:p.name,def:p,obj3d:engine.build(p),visible:true,wireframe:false}}
@@ -58,5 +58,16 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
   fs.writeFileSync('tmp/manufacturing/cases.json',JSON.stringify(manifest));
 
  }
- console.log('PASS: 32 finite geometries, 120-part drone, custom-solid persistence/duplication/BOM/export, real bores, millimetres, project isolation, snapshots and editor lifecycle.');
+ // A one-recipe cache models eviction while loading a large assembly. Build
+ // each real kernel result immediately, then move/duplicate without cached data.
+ const sample=structuredClone(custom.objects[0]);
+ ctx.current={id:'cache-lifecycle',parts:[],assembly3d:{version:1,units:'mm',objects:[{...sample,id:'first',dims:{depth:12}},{...sample,id:'second',dims:{depth:18}}]}};
+ let available=null;const realPrepare=vm.runInContext('StudioSolidModel',ctx).prepare,realGeometry=vm.runInContext('StudioSolidModel',ctx).geometry;
+ vm.runInContext('StudioSolidModel',ctx).prepare=async(model,depth)=>{available=depth;};
+ vm.runInContext('StudioSolidModel',ctx).geometry=(three,model,depth)=>{assert.equal(depth,available,'consume before the next preparation evicts the result');return realGeometry(three,model,depth);};
+ assert.equal(await engine.loadPreparedScene(),true);assert.equal(engine.get().objects.length,2);
+ vm.runInContext('StudioSolidModel',ctx).geometry=()=>{throw Error('Results evicted');};
+ ctx.current.assembly3d.objects[0].position=[10,0,0];engine.loadScene();assert.equal(engine.get().objects[0].obj3d.position.x,1);
+ vm.runInContext('StudioSolidModel',ctx).prepare=realPrepare;vm.runInContext('StudioSolidModel',ctx).geometry=realGeometry;
+ console.log('PASS: 32 finite geometries, 120-part drone, custom-solid persistence/duplication/BOM/export, cache-evicting assembly loading, real bores, millimetres, project isolation, snapshots and editor lifecycle.');
 })().catch(error=>{console.error(error);process.exitCode=1});

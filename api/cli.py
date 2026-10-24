@@ -1,15 +1,16 @@
 """Explicit operational commands; no secrets or verification links are printed."""
-import argparse, json, smtplib, ssl
-from email.message import EmailMessage
+import argparse
 from sqlalchemy import select, delete
 from api.app import create_app
 from api.models import Base, User, Mail, Rate, UsedRefresh, Token, Audit, ProjectInvitation, now, seed
-from api.security import decrypt
 from api.billing import sync_subscription
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('command',choices=['init-db','create-admin','send-mail','reconcile','cleanup']);parser.add_argument('--email');args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('command',choices=['init-db','create-admin','grant-beta','send-mail','reconcile','cleanup']);parser.add_argument('--email');parser.add_argument('--days',type=int,default=7);args=parser.parse_args()
     app=create_app();s=app.state.settings
+    if args.command=='grant-beta':
+        from api.beta_access import grant_beta
+        print('Complimentary beta access:',grant_beta(app.state.Factory,s,args.email or '',args.days));return
     if args.command=='init-db':
         if s.environment=='production':raise SystemExit('Apply the reviewed migration SQL in production; init-db is for development only.')
         Base.metadata.create_all(app.state.engine)
@@ -22,18 +23,8 @@ def main():
             if not user.totp:raise SystemExit('Enable two-factor authentication first.')
             user.role='admin';print('Verified account promoted; this action should be recorded in your operator change log.')
         elif args.command=='send-mail':
-            if not s.smtp_host or not s.mail_from:raise SystemExit('Configure SMTP before running the delivery worker.')
-            rows=list(db.scalars(select(Mail).where(Mail.sent==False,Mail.available<=now()).order_by(Mail.available).limit(25).with_for_update(skip_locked=True)))
-            for row in rows:
-                payload=json.loads(decrypt(s,row.payload));message=EmailMessage();message['From']=s.mail_from;message['To']=payload['to'];message['Subject']=payload['subject'];message['Message-ID']='<'+row.id+'@studio-outbox>';message.set_content(payload['body'])
-                try:
-                    with smtplib.SMTP(s.smtp_host,s.smtp_port,timeout=20) as smtp:
-                        smtp.starttls(context=ssl.create_default_context())
-                        if s.smtp_user:smtp.login(s.smtp_user,s.smtp_password)
-                        smtp.send_message(message)
-                    row.sent=True;row.payload='';print('Outbox delivery completed:',row.id)
-                except (OSError,smtplib.SMTPException):
-                    row.attempts+=1;row.available=now()+min(3600,30*2**min(row.attempts,7));print('Outbox delivery deferred:',row.id)
+            from api.mail_delivery import deliver_pending
+            print('Outbox batch:',deliver_pending(app.state.Factory,s,batch=25))
         elif args.command=='reconcile':
             from api.models import Subscription
             for sub in db.scalars(select(Subscription).where(Subscription.status.not_in(['canceled','incomplete_expired']))):

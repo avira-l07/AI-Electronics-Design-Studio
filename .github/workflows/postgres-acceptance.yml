@@ -1,0 +1,25 @@
+name: Optional PostgreSQL acceptance
+on: workflow_dispatch
+jobs:
+  postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      database:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: studio_test
+          POSTGRES_PASSWORD: synthetic_ci_only
+          POSTGRES_DB: studio_acceptance
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U studio_test -d studio_acceptance"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: pip install -r api/requirements.lock
+      - run: python tests/postgres-acceptance.py
+        env:
+          PG_ACCEPTANCE_URL: postgresql+psycopg://studio_test:synthetic_ci_only@127.0.0.1:5432/studio_acceptance

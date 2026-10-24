@@ -1,0 +1,43 @@
+# One free web service. Database is external Neon Free, configured by the owner.
+# No paid workers, cron jobs, disks, managed databases or automatic upgrades.
+services:
+  - type: web
+    name: engineering-studio-free-beta
+    runtime: python
+    plan: free
+    region: singapore
+    autoDeployTrigger: "off"
+    buildCommand: pip install -r api/requirements.lock
+    startCommand: python -m api.free_host
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.14
+      - key: APP_ENV
+        value: production
+      - key: FREE_BETA
+        value: "true"
+      - key: INLINE_MAIL
+        value: "true"
+      - key: MAIL_TRANSPORT
+        value: resend
+      - key: BILLING_ENABLED
+        value: "false"
+      - key: ALLOW_LIVE_BILLING
+        value: "false"
+      - key: AI_ENABLED
+        value: "false"
+      - key: SHARING_ENABLED
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: TRUSTED_PROXY_IPS
+        sync: false

@@ -1,5 +1,9 @@
 # AI Engineering Design Studio
 
+Current v15.3: [zero-cost beta delivery and limitations](FREE_BETA_DELIVERY.md). Includes a loopback-only synthetic account demo, optional installed-model Ollama proposals, free-host preparation, HTTPS outbox delivery, expiring complimentary Pro access and account-lock/assembly-cache reliability fixes. Cloud/provider activation remains unverified until accounts are configured.
+
+Current project status: [24 October 2026 audit](PROJECT_STATUS_AUDIT_2026-10-24.md) and [roadmap](PROJECT_STATUS_AND_ROADMAP.md). The audit distinguishes locally verified features from held cloud activation and remaining CAD/manufacturing acceptance.
+
 Current follow-up v15.2: [residual-risk review](api/RESIDUAL_RISK_REVIEW.md). Adds deliberate device-data removal, bounded CAD cache/queue and shared preview recovery, configurable sign-in confirmation lifetime and public-file guards. Backend deployment remains held.
 
 Current security follow-up v15.1: [submitted threat-report audit](api/THREAT_REPORT_AUDIT.md). Adds private pending invitations, owner sign-in recovery during lockout, explicit local-data notices and regression tests. Backend deployment remains held.
@@ -12,7 +16,7 @@ Previous v13 usability: [review and workflow](V13_USABILITY_REVIEW.md). Adds dra
 
 Previous v12 engineering milestone: [delivery audit](V12_AUDIT.md), [current checklist](PRIORITY_CHECKLIST.md) and [Free/Pro split](FREE_AND_PRO.md). Adds shared 3D presence/object merging, analytic curve recipes, nonlinear point/segment constraints, face-plane snapshots, bounded shell/sweep/loft/corner operations, manufacturing review tools and expanded analytical models. 52 browser cases and 108 API tests passed; 14 export files passed independent parsing. Cloud deployment is held; real devices, external CAD/slicers and physical acceptance remain unverified.
 
-Historical milestone notes below describe their original scope; V12_AUDIT.md is the current status.
+Historical milestone notes below describe their original scope; PROJECT_STATUS_AND_ROADMAP.md and the latest dated audit provide current status.
 
 Browser-local engineering concept workspace. Serve `dist/` using any static HTTP server.
 

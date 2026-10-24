@@ -1,6 +1,8 @@
 # Production deployment
 
-Cloud activation is on hold at the owner’s request (23 October 2026). Run `python scripts/deployment-check.py` for a redacted local preflight. Apply migration 0005 before running the upgraded API; production health and preflight check migrations 0001–0005. No host/domain or provider accounts have been provisioned. See FREE_AND_PRO.md and V12_AUDIT.md in the repository root.
+For the newly authorized zero-cost beta, use [FREE_BETA_DELIVERY.md](../FREE_BETA_DELIVERY.md) and `deploy/render.free.yaml`. That template creates only a Free web service with external Neon PostgreSQL; no paid resource is provisioned. Cloud activation is blocked by missing provider access/configuration. Paid production deployment and live charging remain unapproved.
+
+Paid production activation remains held. The owner has since authorized free-tier beta preparation/deployment, but cloud credentials are not configured. Run `python scripts/deployment-check.py` for a redacted local preflight. Apply migration 0005 before running the upgraded API; production health and preflight check migrations 0001–0005. No host/domain or provider accounts have been provisioned. See FREE_AND_PRO.md and FREE_BETA_DELIVERY.md in the repository root.
 
 The existing Sites URL serves the static preview. This deployment runs the Python API, the same frontend, PostgreSQL, a separate operational worker and HTTPS on a server you control. No server, domain, email account or payment credential has been provisioned by adding these files.
 

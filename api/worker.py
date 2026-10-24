@@ -4,7 +4,7 @@ from api.config import Settings
 
 def main():
     s=Settings();s.validate()
-    if not s.smtp_host or not s.mail_from:raise SystemExit('Configure SMTP before starting the email worker.')
+    if not s.mail_ready:raise SystemExit('Configure email delivery before starting the worker.')
     stopping=False;child=None
     def stop(*_):
         nonlocal stopping

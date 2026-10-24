@@ -1,5 +1,7 @@
 # Secure API and frontend integration
 
+Current v15.3: [free beta delivery](../FREE_BETA_DELIVERY.md). Free cloud preparation is authorized; provider account access is still required. Includes Resend HTTPS/request-triggered outbox, complimentary Pro, consistent account/token locks and optional loopback Ollama modelling. Default beta startup disables AI and billing; the local demo explicitly opts into the installed local model using `--local-ai`.
+
 Follow-up v15.2: [residual-risk review](RESIDUAL_RISK_REVIEW.md). Sign-in confirmations default to 20 minutes; configure `LOGIN_CONFIRMATION_TTL_SECONDS` within 600–1800 seconds. Delivery and provider activation remain unverified until deployment.
 
 Latest security changes and migration 0005: [submitted threat-report audit](THREAT_REPORT_AUDIT.md). Apply `python -m api.migrate` before starting the upgraded backend. The owner has held cloud deployment pending host/domain details.

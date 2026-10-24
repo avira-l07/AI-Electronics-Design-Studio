@@ -12,9 +12,11 @@ def main():
     except RuntimeError as e:checks['configuration']=str(e)
     checks['production_mode']='pass' if s.environment=='production' else 'not production'
     checks['postgresql']='configured' if s.database_url.startswith('postgresql') else 'not configured'
-    checks['smtp']='configured; delivery unverified' if s.smtp_host and s.mail_from else 'missing'
+    checks['smtp']='configured; delivery unverified ('+s.mail_transport+')' if s.mail_ready else 'missing'
+    checks['free_beta']='enabled; billing/paid AI prohibited' if s.free_beta else 'disabled'
+    checks['outbox']='request-triggered; sleeping hosts delay retries' if s.inline_mail else 'separate worker required'
     checks['stripe']='configured; lifecycle unverified' if s.stripe_key and s.webhook_key and s.monthly_price and s.annual_price else 'missing'
-    checks['ai']='configured; provider unverified' if s.ai_enabled and s.ai_key and s.ai_model else 'disabled or missing'
+    checks['ai']='configured ('+s.ai_provider+'); provider unverified' if s.ai_ready else 'disabled or missing'
     try:
         if not s.database_url.startswith('postgresql'):raise RuntimeError('Production PostgreSQL is not configured')
         engine,_=database(s.database_url)
