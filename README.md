@@ -1,5 +1,7 @@
 # AI Engineering Design Studio
 
+Current v15.8: [category workspace isolation fix](V15_8_PROJECT_WORKSPACES.md). Start a new named category project or explicitly resume the current one. Engine, ship and LoRa projects start empty; Drone uses the real FPV starter. Existing assemblies are preserved, and login retains the selected category. Verified: 30 targeted desktop/phone browser checks, all 12 JavaScript suites and 53 public assets. Ready-made engine geometry remains unimplemented.
+
 Current v15.7: [FPV showcase drone](V15_7_DRONE_SHOWCASE.md). Adds a 136-component editable drone with three-blade propellers, camera, antennas, routed cable envelopes and coordinated finishes; a 41-part library; and a presentation view. Material reload consistency and circular export triangles are fixed. New starters preserve existing projects. No new Premium rules or paid services. Verification: 187 API tests; 144 browser checks with two expected skips; four final targeted drone checks; all 12 JavaScript suites; 53 public assets.
 
 Future business features and the first pilot milestone are saved in the [project bucket list](PROJECT_BUCKET_LIST.md). Premium assignments and prices remain for the owner's later decision.

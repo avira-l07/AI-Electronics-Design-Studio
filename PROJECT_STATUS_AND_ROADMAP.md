@@ -1,5 +1,7 @@
 # Engineering Studio — status and remaining work
 
+Current v15.8: [category workspace isolation fix](V15_8_PROJECT_WORKSPACES.md). Start a new named category project or explicitly resume the current one. Engine, ship and LoRa projects start empty; Drone uses the real FPV starter. Existing assemblies are preserved, and login retains the selected category. Verified: 30 targeted desktop/phone browser checks, all 12 JavaScript suites and 53 public assets. Ready-made engine geometry remains unimplemented.
+
 Current v15.7: [FPV showcase drone](V15_7_DRONE_SHOWCASE.md). Adds a 136-component editable drone with three-blade propellers, camera, antennas, routed cable envelopes and coordinated finishes; a 41-part library; and a presentation view. Material reload consistency and circular export triangles are fixed. New starters preserve existing projects. No new Premium rules or paid services. Verification: 187 API tests; 144 browser checks with two expected skips; four final targeted drone checks; all 12 JavaScript suites; 53 public assets.
 
 Future business plan: [project bucket list](PROJECT_BUCKET_LIST.md), saved 26 October 2026. Includes guided creation, sourced components, handoff packages, classroom workflows, fabrication requests, a marketplace and a proposed 10–20-user pilot. These are backlog items; new Premium assignments and prices await the owner's decisions.

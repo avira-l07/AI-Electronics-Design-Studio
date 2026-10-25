@@ -7,12 +7,25 @@ test('project category options are public resources and do not change account en
  const guest=await browser.newContext({viewport:info.project.use.viewport}),page=await guest.newPage();
  try{
   await page.goto(liveOrigin+'/#/project-types?type=lora');await expect(page.locator('#projectTypeTitle')).toHaveText('LoRa device');await expect(page.locator('.modeBadge')).toHaveText('PUBLIC RESOURCES');
-  expect((await guest.request.get(liveOrigin+'/api/projects')).status()).toBe(401);await page.getByRole('link',{name:'Log in to open the 3D workspace'}).click();await expect(page.locator('#secureAuth')).toBeVisible();await expect(page).toHaveURL(/next=project-types$/);
+  expect((await guest.request.get(liveOrigin+'/api/projects')).status()).toBe(401);await page.getByRole('link',{name:'Log in to start a project'}).click();await expect(page.locator('#secureAuth')).toBeVisible();await expect(page).toHaveURL(/next=project-types&type=lora$/);
   await page.locator('#secureEmail').fill('viewer@example.com');await page.locator('#securePassword').fill('Synthetic test password 739!');await page.locator('#secureAuth button[type=submit]').click();await expect(page.locator('#studioMain h1')).toHaveText('3D project types');
+  await expect(page.locator('#projectTypeTitle')).toHaveText('LoRa device');
   const before=await(await guest.request.get(liveOrigin+'/api/me')).json();expect(before.plan).toBe('free');
   await page.locator('[data-project-type="ship"]').click();await expect(page.locator('#projectTypeTitle')).toHaveText('Ship & boat');
   expect((await(await guest.request.get(liveOrigin+'/api/me')).json()).plan).toBe('free');expect((await guest.request.get(liveOrigin+'/api/premium')).status()).toBe(403);
  }finally{await guest.close();}
+});
+
+test('account category creation preserves an existing assembly, handles failure and reloads the new empty project',async({browser,liveOrigin},info)=>{
+ const owner=await account(browser,liveOrigin,'owner',info.project.use.viewport),page=owner.page;let createdId;
+ try{
+  await page.goto(liveOrigin+'/#/project-types?type=car-engine');await expect(page.locator('.projectTypeResume')).toContainText('Shared browser assembly');const previous=await page.evaluate(()=>structuredClone(current));
+  let posts=0;await page.route(liveOrigin+'/api/projects',async route=>{if(route.request().method()==='POST'&&++posts===1)return route.fulfill({status:403,contentType:'application/json',body:JSON.stringify({detail:'Project creation unavailable for this test.'})});await route.continue();});
+  await page.locator('[data-start-project-type="car-engine"]').click();await page.locator('#projectTypeName').fill('Separate account engine');await page.locator('#modalForm>button[type=submit]').click();await expect(page.locator('#projectTypeCreateError')).toContainText('Project creation unavailable');expect(await page.evaluate(()=>current)).toEqual(previous);await expect(page.locator('#dialog')).toBeVisible();
+  await page.locator('#modalForm>button[type=submit]').click();await expect(page.locator('#v3dLoad')).toBeHidden();await expect(page.locator('.workbenchIdentity strong')).toHaveText('Separate account engine');await expect(page.locator('#v3dCount')).toContainText('0 objects');createdId=await page.evaluate(()=>current.id);expect(createdId).not.toBe(previous.id);expect(posts).toBe(2);
+  await page.reload();await expect(page.locator('#v3dLoad')).toBeHidden();expect(await page.evaluate(()=>current.id)).toBe(createdId);await expect(page.locator('#v3dCount')).toContainText('0 objects');
+  const rows=await(await owner.context.request.get(liveOrigin+'/api/projects')).json();expect(rows.find(p=>p.id===previous.id)).toEqual(previous);expect(rows.find(p=>p.id===createdId).assembly3d.objects).toHaveLength(0);expect(rows.find(p=>p.id===createdId).notes[0].body).toContain('No category-specific model');
+ }finally{if(createdId){const row=(await(await owner.context.request.get(liveOrigin+'/api/projects')).json()).find(p=>p.id===createdId);if(row)await send(owner.context,liveOrigin,'/projects/'+createdId,'DELETE',{version:row.version});}await owner.context.close();}
 });
 
 test('guests browse templates and guide while project data stays protected; login returns to templates',async({browser,liveOrigin},info)=>{

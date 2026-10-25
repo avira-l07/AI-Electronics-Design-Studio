@@ -1,4 +1,4 @@
-/* Project directions only. Browsing does not generate geometry or change plans. */
+/* Category briefs and explicit project creation. Browsing never replaces a project. */
 const StudioProjectTypes=(()=>{
  const types=[
   {id:'car-engine',name:'Car engine',group:'Mechanical',icon:'engine',description:'Explore an engine as a connected assembly of mechanical parts.',parts:['Engine block & cylinder layout','Pistons, connecting rods & crankshaft','Mounts, covers & supporting hardware'],boundary:'Engine timing, combustion, cooling and load analysis need specialist tools and validation.'},
@@ -30,13 +30,30 @@ const StudioProjectTypes=(()=>{
  };
  function art(type){return `<svg viewBox="0 0 128 90" aria-hidden="true" focusable="false"><path d="${drawings[type.icon]}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/></svg>`;}
  function selected(){return types.find(t=>t.id===new URLSearchParams(location.hash.split('?')[1]||'').get('type')) || types[0];}
- function page(){return accountShell(`<section class="projectTypesHero"><div><span class="eyebrow">A DIRECTION FOR EVERY IDEA</span><h2>What would you<br>like to build?</h2><p>Explore engines, vessels, connected devices and more. Choose a project direction and see the components it could bring together.</p></div><div class="projectTypesHeroArt" aria-hidden="true">${art(types[0])}<span>IDEA → PARTS → ASSEMBLY</span></div></section><p class="projectTypesNotice">Category options only. Category-specific starters are not included yet. Selecting an option does not generate a model or change your current project.</p><div class="projectTypesControls"><label for="projectTypeSearch">Find a project type<input id="projectTypeSearch" type="search" placeholder="Try engine, radio, robot…" maxlength="100"></label><label for="projectTypeGroup">Field<select id="projectTypeGroup"><option value="all">All fields</option>${[...new Set(types.map(t=>t.group))].map(g=>`<option>${esc(g)}</option>`).join('')}</select></label><p id="projectTypeCount" role="status"></p></div><div class="projectTypesLayout"><section><h2 class="srOnly">Project category options</h2><div class="projectTypesGrid" id="projectTypesGrid"></div></section><aside class="projectTypeDetail" id="projectTypeDetail" aria-labelledby="projectTypeTitle"></aside></div>`,'3D project types','EXPLORE YOUR NEXT PROJECT');}
+ function hasType(id){return types.some(t=>t.id===id);}
+ function buildProject(id,name){
+  const type=types.find(t=>t.id===id);if(!type)throw Error('Unknown project type.');
+  if(typeof name!=='string'||!name.trim()||name.trim().length>180)throw Error('Enter a project name, up to 180 characters.');
+  if(id==='drone')return buildStudioTemplate('drone',name);
+  const kind=type.group==='Electronics & IoT'?'Electronics project':['Robotics','Energy'].includes(type.group)?'Electromechanical prototype':'Mechanical assembly';
+  return {...structuredClone(initial),id:crypto.randomUUID(),name:name.trim(),kind,designType:'sketch',parts:[],sketch:[],revisions:[],assembly3d:{version:1,units:'mm',objects:[]},notes:[{title:'Project brief · '+type.name,type:'Research',date:new Date().toISOString(),body:type.description+'\n\nPlan these elements:\n'+type.parts.map(p=>'• '+p).join('\n')+'\n\nThis project starts with an empty 3D workspace. No category-specific model has been generated. Add catalogue parts, create solids or import your own geometry.\n\n'+type.boundary}],buildTasks:type.parts.map(name=>({name:'Plan '+name,done:false}))};
+ }
+ function startProject(type){
+  const starter=type.id==='drone';
+  modal('Start a new '+type.name+' project',field('projectTypeName','Project name',type.name)+`<p>${starter?'Creates a separate copy of the editable FPV drone starter.':'Starts with an empty 3D workspace and a '+esc(type.name)+' planning brief. No model is generated automatically.'} Your existing projects are kept.</p><p id="projectTypeCreateError" class="formError" role="alert"></p>`,()=>false);
+  const input=document.getElementById('projectTypeName'),form=document.getElementById('modalForm'),submit=form.querySelector('button[type=submit]');input.required=true;input.maxLength=180;submit.textContent='Create project';let busy=false;
+  form.onsubmit=async event=>{event.preventDefault();if(busy)return;busy=true;submit.disabled=true;try{await saveNewStudioProject(buildProject(type.id,input.value));document.getElementById('dialog').close();location.hash='/workspace?tool=3d';toast(starter?'Your FPV drone project is ready':'Empty '+type.name+' workspace created. Add or import your parts.');}catch(error){document.getElementById('projectTypeCreateError').textContent=error.message;}finally{busy=false;submit.disabled=false;}};
+ }
+ function page(){return accountShell(`<section class="projectTypesHero"><div><span class="eyebrow">A DIRECTION FOR EVERY IDEA</span><h2>What would you<br>like to build?</h2><p>Explore engines, vessels, connected devices and more. Choose a project direction and see the components it could bring together.</p></div><div class="projectTypesHeroArt" aria-hidden="true">${art(types[0])}<span>IDEA → PARTS → ASSEMBLY</span></div></section><p class="projectTypesNotice">Selecting a category does not generate a model or change your current project. Start a new project explicitly, or resume the current one. The drone has an editable starter; other categories start with an empty workspace.</p><div class="projectTypesControls"><label for="projectTypeSearch">Find a project type<input id="projectTypeSearch" type="search" placeholder="Try engine, radio, robot…" maxlength="100"></label><label for="projectTypeGroup">Field<select id="projectTypeGroup"><option value="all">All fields</option>${[...new Set(types.map(t=>t.group))].map(g=>`<option>${esc(g)}</option>`).join('')}</select></label><p id="projectTypeCount" role="status"></p></div><div class="projectTypesLayout"><section><h2 class="srOnly">Project category options</h2><div class="projectTypesGrid" id="projectTypesGrid"></div></section><aside class="projectTypeDetail" id="projectTypeDetail" aria-labelledby="projectTypeTitle"></aside></div>`,'3D project types','EXPLORE YOUR NEXT PROJECT');}
  function bind(){
   const grid=document.getElementById('projectTypesGrid');if(!grid)return;
   const search=document.getElementById('projectTypeSearch'),group=document.getElementById('projectTypeGroup'),detail=document.getElementById('projectTypeDetail');let choice=selected();
   function showDetail(){
    const guest=studioBackend.enabled&&!signedIn;
-   detail.innerHTML=`<span class="projectTypeStatus">CATEGORY PREVIEW</span><div class="projectTypeDetailArt">${art(choice)}</div><span class="eyebrow">${esc(choice.group)}</span><h2 id="projectTypeTitle">${esc(choice.name)}</h2><p>${esc(choice.description)}</p><h3>Typical elements</h3><ul>${choice.parts.map(p=>`<li>${esc(p)}</li>`).join('')}</ul><div class="projectTypeBoundary"><b>Specialist work to consider</b><p>${esc(choice.boundary)}</p></div><a class="pbutton primary" href="${guest?'#/login?next=project-types':'#/workspace?tool=3d'}">${guest?'Log in to open the 3D workspace':'Open manual 3D workspace'} ↗</a><p class="projectTypeFootnote">Opens the existing editor. A category-specific model is not created automatically.</p>`;
+   const starter=choice.id==='drone',resume=!guest&&projects.some(p=>p.id===current?.id);
+   detail.innerHTML=`<span class="projectTypeStatus">${starter?'EDITABLE STARTER AVAILABLE':'PROJECT BRIEF · EMPTY WORKSPACE'}</span><div class="projectTypeDetailArt">${art(choice)}</div><span class="eyebrow">${esc(choice.group)}</span><h2 id="projectTypeTitle">${esc(choice.name)}</h2><p>${esc(choice.description)}</p><h3>Typical elements</h3><ul>${choice.parts.map(p=>`<li>${esc(p)}</li>`).join('')}</ul><div class="projectTypeBoundary"><b>Specialist work to consider</b><p>${esc(choice.boundary)}</p></div><div class="projectTypeStartInfo"><b>${starter?'Create a separate drone starter copy':'Start a new, empty '+esc(choice.name)+' workspace'}</b><p>${starter?'Includes the editable FPV showcase assembly.':'No ready-made '+esc(choice.name)+' model is included yet. Add catalogue parts, create solids or import your own model.'} Your current project stays separate.</p></div>${guest?`<a class="pbutton primary" href="#/login?next=project-types&type=${choice.id}">Log in to start a project ↗</a>`:`<button type="button" class="pbutton primary" data-start-project-type="${choice.id}">Start new ${esc(choice.name)} project ↗</button>`}${resume?`<a class="projectTypeResume" href="#/workspace?tool=3d"><span>Resume current project ↗</span><strong>${esc(current.name)}</strong></a>`:''}<p class="projectTypeFootnote">Choosing a category never replaces a saved project.</p>`;
+   const start=detail.querySelector('[data-start-project-type]');if(start){const type=choice;start.onclick=()=>startProject(type);}
+
   }
   function showGrid(){
    const q=search.value.trim().toLowerCase(),matches=types.filter(t=>(group.value==='all'||t.group===group.value)&&[t.name,t.group,t.description,...t.parts].join(' ').toLowerCase().includes(q));
@@ -53,7 +70,7 @@ const StudioProjectTypes=(()=>{
   }
   search.oninput=showGrid;group.onchange=showGrid;showGrid();showDetail();
  }
- return {page,bind};
+ return {page,bind,buildProject,hasType};
 })();
 function projectTypesPage(){return StudioProjectTypes.page();}
 productRoutes.push('project-types');

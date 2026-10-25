@@ -18,3 +18,13 @@
 @media(max-width:420px){.projectTypesGrid{gap:12px}.projectTypeDetail ul{columns:1}.projectTypeCard strong{font-size:16px}.projectTypeCard p{font-size:11px}.projectTypeCardFoot{font-size:9px}.projectTypesHero p{font-size:12px}}
 @media(prefers-reduced-motion:reduce){.projectTypeCard{transition:none}}
 :root[data-reduced-motion=true] .projectTypeCard{transition:none}
+
+/* Starting a category project and resuming an existing design are distinct actions. */
+.projectTypeStartInfo { margin:20px 0 14px; border-left:3px solid var(--action); padding:2px 0 2px 12px; }
+.projectTypeStartInfo b { font-size:12px; line-height:1.6; }
+.projectTypeStartInfo p { margin:6px 0 0; font-size:11px; }
+.projectTypeDetail button.pbutton { cursor:pointer; font:inherit; font-size:12px; min-height:44px; line-height:1.6; }
+.projectTypeResume { display:flex; flex-direction:column; gap:6px; margin-top:14px; padding:13px; border:1px solid var(--edge); border-radius:8px; text-decoration:none; color:var(--text); background:var(--surface-soft); }
+.projectTypeResume span { font-size:10px; color:var(--text-muted); }
+.projectTypeResume strong { font-size:12px; overflow-wrap:anywhere; }
+.projectTypeDetail button:focus-visible { outline:2px solid var(--action); outline-offset:4px; }
