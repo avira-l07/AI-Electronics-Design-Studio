@@ -3,6 +3,18 @@ const test=base.extend({liveOrigin:[async({},use)=>{const port=await new Promise
 async function send(context,origin,url,method='POST',data={}){const token=(await(await context.request.get(origin+'/api/csrf')).json()).token;return context.request.fetch(origin+'/api'+url,{method,data,headers:{Origin:origin,'X-CSRF-Token':token}});}
 async function account(browser,origin,name,viewport){const context=await browser.newContext({viewport}),page=await context.newPage();await page.goto(origin+'/#/login');await page.locator('#secureEmail').fill(name+'@example.com');await page.locator('#securePassword').fill('Synthetic test password 739!');await page.locator('#secureAuth button[type=submit]').click();await expect(page.locator('[data-team-inbox]')).toBeVisible();return {context,page};}
 
+test('project category options are public resources and do not change account entitlements',async({browser,liveOrigin},info)=>{
+ const guest=await browser.newContext({viewport:info.project.use.viewport}),page=await guest.newPage();
+ try{
+  await page.goto(liveOrigin+'/#/project-types?type=lora');await expect(page.locator('#projectTypeTitle')).toHaveText('LoRa device');await expect(page.locator('.modeBadge')).toHaveText('PUBLIC RESOURCES');
+  expect((await guest.request.get(liveOrigin+'/api/projects')).status()).toBe(401);await page.getByRole('link',{name:'Log in to open the 3D workspace'}).click();await expect(page.locator('#secureAuth')).toBeVisible();await expect(page).toHaveURL(/next=project-types$/);
+  await page.locator('#secureEmail').fill('viewer@example.com');await page.locator('#securePassword').fill('Synthetic test password 739!');await page.locator('#secureAuth button[type=submit]').click();await expect(page.locator('#studioMain h1')).toHaveText('3D project types');
+  const before=await(await guest.request.get(liveOrigin+'/api/me')).json();expect(before.plan).toBe('free');
+  await page.locator('[data-project-type="ship"]').click();await expect(page.locator('#projectTypeTitle')).toHaveText('Ship & boat');
+  expect((await(await guest.request.get(liveOrigin+'/api/me')).json()).plan).toBe('free');expect((await guest.request.get(liveOrigin+'/api/premium')).status()).toBe(403);
+ }finally{await guest.close();}
+});
+
 test('guests browse templates and guide while project data stays protected; login returns to templates',async({browser,liveOrigin},info)=>{
  const context=await browser.newContext({viewport:info.project.use.viewport}),page=await context.newPage();
  try{

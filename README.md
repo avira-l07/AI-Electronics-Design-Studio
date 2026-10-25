@@ -1,5 +1,7 @@
 # AI Engineering Design Studio
 
+Current v15.6: [3D project-type options](V15_6_PROJECT_OPTIONS.md). Adds twelve searchable project directions, including engines, ships and LoRa devices, with component descriptions and links to the existing manual workspace. Category-specific generation and new Premium assignments await the owner's decisions. Existing Free/Pro rules and billing remain unchanged. Verification passed: 140 browser checks, two expected skips, all 12 JavaScript suites and the 51-asset guard.
+
 Current v15.5: [verified security audit and fixes](api/SECURITY_AUDIT_2026-10-25.md). Adds anonymous snapshot throttling, rolling recipient invitation limits, defensive exports, background manufacturing review, once-only replay alerts and Stripe schema/version checks. Verification: 186 API tests, 132 browser checks with two expected skips, all 12 JavaScript suites and the 49-asset guard passed. Backend changes require deployment; paid services remain disabled.
 
 Current v15.4: [user-perspective UX audit and fixes](UX_AUDIT_2026-10-24.md). Restores project commands, fractional price entry, session form drafts, public account-mode resource browsing, embedded 3D page scrolling, sticky tables and clearer feedback. Separates confirmed findings from claims about overridden legacy code. Cloud activation and paid services remain unchanged.

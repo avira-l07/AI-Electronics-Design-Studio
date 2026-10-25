@@ -343,6 +343,7 @@ ${assemblyGuide()}<div class="editor3d" id="editor3d" data-mobile-panel="parts">
   <div class="workbenchHeader"><div class="workbenchIdentity"><span class="workbenchMark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m12 2 9 5v10l-9 5-9-5V7l9-5Zm0 10L3 7m9 5 9-5m-9 5v10"/></svg></span><div><span class="workbenchEyebrow">3D DESIGN STUDIO</span><strong>${esc(current.name)}</strong></div><span class="workbenchStorage">${studioBackend.enabled?'Connected account':'Local device'}</span></div><div class="workbenchHeaderActions"><button id="findWorkbenchTool" title="Find a 3D tool (Ctrl or Command + /)"><span aria-hidden="true">⌕</span> Find a tool <kbd>Ctrl /</kbd></button><button id="workbenchHelp" aria-label="Workspace controls and help">?</button><button id="focusWorkbench" title="Expand or restore workspace">⤢ <span>Expand</span></button></div></div>
   <!-- Tools stay visible in named groups; the finder also reaches advanced tools. -->
   <div class="editor3d-toolbar">
+    <div class="workbenchToolGroup" role="group" aria-label="Project directions"><span class="tb-label">EXPLORE</span><div><a id="openProjectTypes" class="projectTypesEntry" href="#/project-types">Project types ↗</a></div></div>
     <div class="workbenchToolGroup" role="group" aria-label="History"><span class="tb-label">HISTORY</span><div><button id="tb-undo" title="Undo 3D edit">↶ Undo</button><button id="tb-redo" title="Redo 3D edit">↷ Redo</button></div></div>
     <div class="workbenchToolGroup" role="group" aria-label="Camera"><span class="tb-label">NAVIGATE</span><div>
     ${tbBtn('tb-orbit','Orbit','M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3','active')}
@@ -744,6 +745,7 @@ ${assemblyGuide()}<div class="editor3d" id="editor3d" data-mobile-panel="parts">
     ['tb-rotate','Rotate selected parts','Transform','Rotate with the 3D rings or numeric inspector'],
     ['tb-dup','Duplicate selected parts','Assembly','Create editable copies of the selection'],
     ['selectAllParts','Select all parts','Assembly','Build a multiple selection for shared edits'],
+    ['openProjectTypes','Explore 3D project types','Explore','Engine, ship, LoRa, robotics and other project directions'],
     ['groupParts','Group selected parts','Assembly','Keep a set of components together'],
     ['ungroupParts','Ungroup selected parts','Assembly','Release an assembly group'],
     ['alignParts','Align selected parts','Assembly','Use the axis and edge set in Assembly tools'],

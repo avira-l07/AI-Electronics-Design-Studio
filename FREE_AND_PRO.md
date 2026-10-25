@@ -1,5 +1,7 @@
 # Free and Pro — implemented feature split
 
+26 October 2026, v15.6: [3D project-type options](V15_6_PROJECT_OPTIONS.md) are now browsable. This adds category choices only; model generation and new Premium assignments await the owner's instructions. No existing entitlement or payment rule below has changed.
+
 v15.3 zero-cost beta: the operator may grant verified testers 1–30 days of complimentary Pro using `python -m api.cli grant-beta --email EMAIL --days 7` only with `FREE_BETA=true` and disabled billing. It creates no payment or provider subscription, never renews, and ordinary plan checks enforce expiry. No public grant endpoint exists. See [FREE_BETA_DELIVERY.md](FREE_BETA_DELIVERY.md) for deployment prerequisites and limits.
 
 24 October 2026. Free-tier beta preparation and deployment are authorized; cloud account access and external acceptance remain outstanding. Prices, merchant credentials and live charging are not active. Optional local Ollama modelling uses the same Pro entitlement and quotas; complimentary beta access enables it without a purchase.

@@ -1,5 +1,7 @@
 # Engineering Studio — current delivery checklist
 
+Latest v15.6: [3D project-type options](V15_6_PROJECT_OPTIONS.md). Twelve illustrated, searchable directions are available, with manual-editor navigation and project preservation. Category-specific generation and future Free/Premium assignments remain pending owner input. 140 browser checks passed with two expected skips; all 12 JavaScript suites and the 51-asset guard passed. Existing backend activation and CAD acceptance work below remain outstanding.
+
 Latest v15.5: [submitted security audit](api/SECURITY_AUDIT_2026-10-25.md). Confirmed gaps fixed: pre-database snapshot limits, persistent rolling recipient quotas, export validation, background manufacturing review, replay alerts and Stripe schema/version drift. 186 API tests and 132 desktop/phone browser checks passed, with two expected browser skips; all 12 JavaScript suites and the 49-asset guard passed. Backend source fixes are not live until deployment. No paid services were activated.
 
 Latest v15.4: [verified UX audit](UX_AUDIT_2026-10-24.md). Fixes command actions, fractional prices, unapplied form retention, public template/guide browsing, 3D scrolling, table headers, circuit contrast, inspector stacking, export feedback and empty BOM guidance. Account project routes remain protected; deeper CAD and cloud dependencies below remain outstanding.

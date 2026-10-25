@@ -1,5 +1,7 @@
 # Engineering Studio — status and remaining work
 
+Latest v15.6: [3D project-type options](V15_6_PROJECT_OPTIONS.md). Adds a public catalogue for engines, ships, LoRa devices and nine other project directions. These are choices and scope descriptions, not generated assemblies or validated domain tools. The owner will define future Premium assignments; existing plan rules and billing are unchanged.
+
 Latest v15.5: [security audit and remediation](api/SECURITY_AUDIT_2026-10-25.md) distinguishes confirmed gaps from existing defenses and optional policies. Snapshot/invitation abuse limits, export validation, background manufacturing checks, replay notices and billing version/schema protection are implemented and locally verified. Full suites: 186 API tests; 132 browser checks passed, two expected skips. Frontend publication does not deploy the backend. Cloud, provider and manufacturing acceptance below remain outstanding.
 
 Latest v15.4: [user-perspective audit](UX_AUDIT_2026-10-24.md) reviews all supplied UX findings and delivers the confirmed fixes. Public resource browsing does not expose account projects; unapplied form drafts do not silently save. The v15.3 free-beta architecture and outstanding cloud/manufacturing/CAD limits remain below.
