@@ -38,6 +38,51 @@
       "thickness": 2.5,
       "boreDiameter": 5
     },
+    "propeller_tri_cw": {
+      "diameter": 127,
+      "thickness": 3,
+      "boreDiameter": 5
+    },
+    "propeller_tri_ccw": {
+      "diameter": 127,
+      "thickness": 3,
+      "boreDiameter": 5
+    },
+    "fpv_camera": {
+      "width": 20,
+      "height": 20,
+      "depth": 24
+    },
+    "camera_mount": {
+      "width": 28,
+      "height": 24,
+      "depth": 24,
+      "wallThickness": 2
+    },
+    "drone_antenna": {
+      "diameter": 7,
+      "length": 42
+    },
+    "motor_harness": {
+      "length": 100,
+      "height": 5,
+      "diameter": 1.4
+    },
+    "battery_lead": {
+      "length": 28,
+      "height": 12,
+      "diameter": 2.2
+    },
+    "power_connector": {
+      "width": 14,
+      "height": 8,
+      "depth": 12
+    },
+    "arm_bumper": {
+      "diameter": 33,
+      "height": 12,
+      "thickness": 2
+    },
     "battery_pack": {
       "width": 36,
       "height": 25,

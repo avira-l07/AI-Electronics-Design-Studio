@@ -270,3 +270,12 @@
   #workbenchToolResults button { grid-template-columns:57px minmax(0,1fr) 10px; gap:8px; }
 }
 @media(prefers-reduced-motion:reduce) { .editor3d .catalogueCard { transition:none; } }
+
+/* Presentation keeps the live model and orbit controls, with one clear exit. */
+#editor3d.isPresentation { grid-template-areas:"heading" "viewport" "status"; grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr) auto; }
+#editor3d.isPresentation .editor3d-toolbar, #editor3d.isPresentation .assemblyCoach, #editor3d.isPresentation .editor3d-parts, #editor3d.isPresentation .editor3d-inspector, #editor3d.isPresentation .mobileWorkspacePanels, #editor3d.isPresentation #findWorkbenchTool, #editor3d.isPresentation #focusWorkbench, #editor3d.isPresentation #workbenchHelp { display:none; }
+#editor3d.isPresentation .viewport3d { grid-area:viewport; min-height:0; }
+#editor3d.isPresentation #presentWorkbench { color:#f1f6ed; background:#30574a; }
+@media(max-width:600px) { .workbenchHeaderActions #presentWorkbench { padding:5px 7px; font-size:11px; gap:4px; } }
+
+.templateArt .dronePreview { display:block; width:100%; height:100%; max-width:none; object-fit:cover; object-position:50% 58%; padding:0; }

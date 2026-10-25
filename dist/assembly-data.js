@@ -8,6 +8,15 @@ const StudioAssembly=(()=>{
       {id:'motor_brushless',name:'Brushless outrunner',desc:'Generic motor envelope',icon:'motor_dc',dims:{diameter:28,length:20,shaftDiameter:5,shaftLength:9},mat:'Aluminium / Steel',col:0xa45b32},
       {id:'propeller_cw',name:'Two-blade propeller · CW',desc:'Illustrative clockwise blade pitch',icon:'shaft',dims:{diameter:127,thickness:2.5,boreDiameter:5},mat:'ABS polymer',col:0x3a4040},
       {id:'propeller_ccw',name:'Two-blade propeller · CCW',desc:'Illustrative counterclockwise pitch',icon:'shaft',dims:{diameter:127,thickness:2.5,boreDiameter:5},mat:'ABS polymer',col:0x3a4040},
+      {id:'propeller_tri_cw',name:'Three-blade propeller · CW',desc:'Swept blades · illustrative pitch',icon:'shaft',dims:{diameter:127,thickness:3,boreDiameter:5},mat:'ABS polymer',col:0x22b8ba},
+      {id:'propeller_tri_ccw',name:'Three-blade propeller · CCW',desc:'Swept blades · illustrative pitch',icon:'shaft',dims:{diameter:127,thickness:3,boreDiameter:5},mat:'ABS polymer',col:0x22b8ba},
+      {id:'fpv_camera',name:'FPV camera module',desc:'Housing, lens and bezel · concept',icon:'enclosure',dims:{width:20,height:20,depth:24},mat:'ABS polymer',col:0x252d36},
+      {id:'camera_mount',name:'FPV camera cradle',desc:'Open U cradle · adjustable envelope',icon:'bracket',dims:{width:28,height:24,depth:24,wallThickness:2},mat:'ABS polymer',col:0xf17938},
+      {id:'drone_antenna',name:'FPV antenna',desc:'Flexible stem and antenna cap · concept',icon:'shaft',dims:{diameter:7,length:42},mat:'ABS polymer',col:0x29353d},
+      {id:'motor_harness',name:'Motor cable harness',desc:'Three routed silicone cable envelopes',icon:'shaft',dims:{length:100,height:5,diameter:1.4},mat:'ABS polymer',col:0x343d44},
+      {id:'battery_lead',name:'Battery power lead',desc:'Red/black paired cable envelope',icon:'shaft',dims:{length:28,height:12,diameter:2.2},mat:'ABS polymer',col:0x343d44},
+      {id:'power_connector',name:'Power connector',desc:'Two-pole connector envelope · unrated',icon:'enclosure',dims:{width:14,height:8,depth:12},mat:'ABS polymer',col:0xe4aa38},
+      {id:'arm_bumper',name:'Motor landing bumper',desc:'Open motor guard and landing pad',icon:'bearing',dims:{diameter:33,height:12,thickness:2},mat:'ABS polymer',col:0xf17938},
       {id:'battery_pack',name:'Drone battery pack',desc:'Envelope only · ratings unspecified',icon:'enclosure',dims:{width:36,height:25,depth:76},mat:'ABS polymer',col:0x35473c},
       {id:'battery_strap',name:'Battery retaining strap',desc:'Rectangular strap envelope',icon:'bracket',dims:{width:40,height:29,depth:12,wallThickness:1},mat:'ABS polymer',col:0x343638},
       {id:'flight_controller',name:'Flight controller board',desc:'30 mm hole pattern · concept',icon:'pcb',dims:{width:36,height:36,thickness:1.6},mat:'FR4',col:0x1a4a28},
@@ -65,6 +74,7 @@ const StudioAssembly=(()=>{
     if(d.headDiameter&&d.headDiameter<=d.diameter)return false;
     if(d.acrossFlats&&d.acrossFlats<=d.diameter)return false;
     if(d.flangeDiameter&&d.flangeDiameter<d.outerDiameter)return false;
+    if(id==='arm_bumper'&&d.thickness>=Math.min(d.diameter/2,d.height))return false;
     return true;
   }
   function validate(a){

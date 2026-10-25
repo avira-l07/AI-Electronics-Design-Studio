@@ -8,7 +8,7 @@
 
   let libraryPromise;
   async function ensureThree(){
-    if(!libraryPromise)libraryPromise=Promise.all([import('./vendor/three/three.module.js'),import('./vendor/three/OrbitControls.js'),import('./vendor/three/TransformControls.js')]).then(([three,controls,transforms])=>{window.THREE={...three,OrbitControls:controls.OrbitControls,TransformControls:transforms.TransformControls};}).catch(error=>{libraryPromise=null;throw error});
+    if(!libraryPromise)libraryPromise=Promise.all([import('./vendor/three/three.module.js'),import('./vendor/three/OrbitControls.js'),import('./vendor/three/TransformControls.js'),import('./vendor/three/RoomEnvironment.js')]).then(([three,controls,transforms,environment])=>{window.THREE={...three,OrbitControls:controls.OrbitControls,TransformControls:transforms.TransformControls,RoomEnvironment:environment.RoomEnvironment};}).catch(error=>{libraryPromise=null;throw error});
     return libraryPromise;
   }
   async function ensureSolids(){await ensureThree();await StudioSolidModel.init();}
@@ -67,7 +67,7 @@
     'Brass': 0xc8a840,
     'FR4': 0x1a4a28,
     'Aluminium / Steel': 0x606868,
-    'Carbon fibre': 0x4c5e63,
+    'Carbon fibre': 0x27343f,
   };
 
   const DIM_LABELS = {
@@ -80,6 +80,8 @@
 
   /* ─── State ──────────────────────────────────────────────────── */
   let renderer = null, scene = null, camera = null, controls = null, raf = null;
+  let environmentTarget=null;
+  let carbonWeave=null,presentationMode=false,presentationWasFocused=false;
   let objects = [];          // placed scene objects
   let selId = null;          // selected id
   let selectedIds=new Set(),assemblyGroups=[],assemblyJoints=[],multiPivot=null,measurePoints=[],measureMode=false,measureLine=null;
@@ -105,9 +107,10 @@
   window.Studio3DAssets={ready:ensureThree,build:record=>build({...structuredClone(record),id:record.partId,mat:record.material})};
   function ring(outer,inner,length,mat,sides=48){
     const T=window.THREE,shape=new T.Shape();
-    if(sides===6){for(let i=0;i<6;i++){const a=i*Math.PI/3,x=outer*Math.cos(a),y=outer*Math.sin(a);i?shape.lineTo(x,y):shape.moveTo(x,y);}shape.closePath();}
-    else shape.absarc(0,0,outer,0,Math.PI*2,false);
-    if(inner>0){const hole=new T.Path();hole.absarc(0,0,inner,0,Math.PI*2,true);shape.holes.push(hole);}
+    // Explicit loops avoid the coincident 0 / 2π vertices emitted by full
+    // circular paths, which otherwise produce zero-area export triangles.
+    for(let i=0;i<sides;i++){const a=i*Math.PI*2/sides,x=outer*Math.cos(a),y=outer*Math.sin(a);i?shape.lineTo(x,y):shape.moveTo(x,y);}shape.closePath();
+    if(inner>0){const hole=new T.Path();for(let i=0;i<48;i++){const a=-i*Math.PI*2/48,x=inner*Math.cos(a),y=inner*Math.sin(a);i?hole.lineTo(x,y):hole.moveTo(x,y);}hole.closePath();shape.holes.push(hole);}
     const geometry=new T.ExtrudeGeometry(shape,{depth:length,bevelEnabled:false,steps:1,curveSegments:24});geometry.rotateX(-Math.PI/2);return new T.Mesh(geometry,mat);
   }
 
@@ -117,7 +120,15 @@
     const d = p.dims;
     if(p.id==='imported_mesh')return new T.Mesh(StudioMeshParts.geometry(T,p.mesh,p.dims.scale),new T.MeshStandardMaterial({color:MAT_COLORS[p.mat]||0xa8b8c8,metalness:.3,roughness:.5,side:T.DoubleSide}));
     const col = p.col !== undefined ? p.col : (MAT_COLORS[p.mat] || 0x8a9a8a);
-    const mat = (c = col) => new T.MeshStandardMaterial({color:c,metalness:['Steel','Brass','Aluminium 6061','Aluminium / Steel'].includes(p.mat)?0.7:0.05,roughness:p.mat==='ABS polymer'?0.7:0.36});
+    const customMaterial=p.mat!==ALL_PARTS.find(base=>base.id===p.id)?.mat;
+    const mat = (c = col) => {
+      if(customMaterial)c=col;
+      if(p.mat==='Carbon fibre'){
+        if(!carbonWeave){const pixels=new Uint8Array(16*16*4);for(let y=0;y<16;y++)for(let x=0;x<16;x++){const offset=(y*16+x)*4,value=((Math.floor(x/2)+Math.floor(y/2))%2?180:110)+((x+y)%2)*18;pixels.set([value,value,value,255],offset);}carbonWeave=new T.DataTexture(pixels,16,16);carbonWeave.wrapS=carbonWeave.wrapT=T.RepeatWrapping;carbonWeave.repeat.set(3,3);carbonWeave.needsUpdate=true;}
+        return new T.MeshPhysicalMaterial({color:c,metalness:.25,roughness:.43,clearcoat:.35,clearcoatRoughness:.3,bumpMap:carbonWeave,bumpScale:.009,envMapIntensity:.5});
+      }
+      return new T.MeshStandardMaterial({color:c,metalness:['Steel','Brass','Aluminium 6061','Aluminium / Steel'].includes(p.mat)?0.7:0.05,roughness:p.mat==='ABS polymer'?.48:.36,envMapIntensity:.45});
+    };
     const box = (w, h, l, x = 0, y = 0, z = 0, c) => {
       const m = new T.Mesh(new T.BoxGeometry(w, h, l), mat(c));
       m.position.set(x, y, z);
@@ -133,13 +144,28 @@
       meshes.forEach(m => g.add(m));
       return g;
     };
+    // Small edge bevels catch the studio lights without changing part envelopes.
+    const bevelBox=(w,h,l,x=0,y=0,z=0,c=col)=>{
+      const b=Math.min(w,h,l)*.12,shape=new T.Shape();w-=2*b;l-=2*b;
+      [[-w/2+b,-l/2],[w/2-b,-l/2],[w/2,-l/2+b],[w/2,l/2-b],[w/2-b,l/2],[-w/2+b,l/2],[-w/2,l/2-b],[-w/2,-l/2+b]].forEach(([u,v],i)=>i?shape.lineTo(u,v):shape.moveTo(u,v));shape.closePath();
+      const geometry=new T.ExtrudeGeometry(shape,{depth:h-2*b,bevelEnabled:true,bevelSize:b,bevelThickness:b,bevelSegments:2,steps:1});geometry.rotateX(-Math.PI/2);const mesh=new T.Mesh(geometry,mat(c));mesh.position.set(x,y-h/2+b,z);return mesh;
+    };
+    const cable=(points,r,c)=>{
+      const path=new T.CatmullRomCurve3(points.map(v=>new T.Vector3(...v))),geometry=new T.TubeGeometry(path,20,r,8,false),positions=Array.from(geometry.attributes.position.array),indices=Array.from(geometry.index.array);
+      // TubeGeometry leaves its ends open. Cap them so cable exports have
+      // closed surfaces as well as a curved viewport silhouette.
+      for(const end of [0,1]){const centre=path.getPointAt(end),normal=path.getTangentAt(end).multiplyScalar(end?1:-1),ci=positions.length/3,offset=end?20*9:0;positions.push(...centre.toArray());for(let j=0;j<8;j++){const a=offset+j,b=offset+j+1,u=new T.Vector3().fromArray(positions,a*3).sub(centre),v=new T.Vector3().fromArray(positions,b*3).sub(centre);if(u.cross(v).dot(normal)>0)indices.push(ci,a,b);else indices.push(ci,b,a);}}
+      geometry.setAttribute('position',new T.Float32BufferAttribute(positions,3));geometry.deleteAttribute('uv');geometry.deleteAttribute('normal');geometry.setIndex(indices);geometry.computeVertexNormals();return new T.Mesh(geometry,mat(c));
+    };
     const s = 0.1; // 1 mm = 0.1 scene unit (1 unit = 10 mm)
 
     switch (p.id) {
       case 'custom_solid':return new T.Mesh(StudioSolidModel.geometry(T,p.model,d.depth),mat());
       case 'quad_plate': {
         const W=d.width*s,H=d.height*s,shape=new T.Shape();
-        shape.moveTo(-W/2,-H/2);shape.lineTo(W/2,-H/2);shape.lineTo(W/2,H/2);shape.lineTo(-W/2,H/2);shape.closePath();
+        const corner=Math.min(W,H)*.07;
+        [[-W/2+corner,-H/2],[W/2-corner,-H/2],[W/2,-H/2+corner],[W/2,H/2-corner],[W/2-corner,H/2],[-W/2+corner,H/2],[-W/2,H/2-corner],[-W/2,-H/2+corner]].forEach(([x,z],i)=>i?shape.lineTo(x,z):shape.moveTo(x,z));shape.closePath();
+        const window=new T.Path();window.moveTo(-W*.1,-H*.16);window.lineTo(-W*.1,H*.16);window.lineTo(W*.1,H*.16);window.lineTo(W*.1,-H*.16);window.closePath();shape.holes.push(window);
         const holes=[[-30,0],[30,0],[0,-24],[0,24],[-15,-15],[-15,15],[15,-15],[15,15]];
         for(const sx of [-1,1])for(const sz of [-1,1])for(const offset of [0,8])holes.push([sx*(30+offset*60/Math.hypot(60,72)),sz*(18+offset*72/Math.hypot(60,72))]);
         holes.forEach(([x,z])=>{const h=new T.Path();h.absarc(x/80*W,z/60*H,Math.min(W,H)*.02,0,Math.PI*2,true);shape.holes.push(h);});
@@ -161,29 +187,76 @@
       }
       case 'motor_brushless': {
         const R=d.diameter*s/2,L=d.length*s;
-        const g=grp(cyl(R*.93,L*.12,32,0,L*.06,0,0x899397),ring(R*.9,R*.38,L*.78,mat(0x262e32)),ring(R,R*.85,L*.68,mat(0xa86039)),ring(R,d.shaftDiameter*s/2,L*.1,mat(0x9fa9ad)),cyl(d.shaftDiameter*s/2,d.shaftLength*s,24,0,L+d.shaftLength*s/2,0,0xb6c0c0));
-        g.children[1].position.y=L*.12;g.children[2].position.y=L*.22;g.children[3].position.y=L*.9;
-        for(let i=0;i<12;i++){const a=i*Math.PI/6;g.add(cyl(R*.12,L*.56,8,Math.cos(a)*R*.64,L*.46,Math.sin(a)*R*.64,0xb37446));}
+        const g=grp(cyl(R*.93,L*.12,32,0,L*.06,0,0x929da8),ring(R*.89,R*.84,L*.71,mat(0x222c36)),ring(R,R*.87,L*.1,mat(0xe7813c)),ring(R*.98,R*.83,L*.07,mat(0x273440)),cyl(R*.22,L*.1,24,0,L*.95,0,0x71818e),cyl(d.shaftDiameter*s/2,d.shaftLength*s,24,0,L+d.shaftLength*s/2,0,0xbdc8cf));
+        g.children[1].position.y=L*.12;g.children[2].position.y=L*.83;g.children[3].position.y=L*.93;
+        for(let i=0;i<12;i++){const a=i*Math.PI/6;g.add(cyl(R*.105,L*.58,8,Math.cos(a)*R*.64,L*.47,Math.sin(a)*R*.64,0xb67b47));}
+        for(let i=0;i<6;i++){const a=i*Math.PI/3,spoke=box(R*.65,L*.1,R*.16,Math.sin(a)*R*.51,L*.96,Math.cos(a)*R*.51,0x35434e);spoke.rotation.y=a-Math.PI/2;g.add(spoke);}
         return g;
       }
       case 'propeller_cw':
-      case 'propeller_ccw': {
+      case 'propeller_ccw':
+      case 'propeller_tri_cw':
+      case 'propeller_tri_ccw': {
         const R=d.diameter*s/2,bore=d.boreDiameter*s/2,H=d.thickness*s,hub=Math.max(R*.14,bore+(R-bore)*.04),start=Math.max(hub*.75,bore+(hub-bore)*.5);
-        const propMat=()=>mat(p.mat==='ABS polymer'?(p.id==='propeller_cw'?0x88b887:0x688eaa):col);
+        const triple=p.id.startsWith('propeller_tri_'),hand=p.id.endsWith('_ccw')?-1:1;
+        const propMat=()=>mat(p.mat==='ABS polymer'?(triple?0x23aeb7:(p.id==='propeller_cw'?0x88b887:0x688eaa)):col);
         const g=grp(ring(hub,bore,H,propMat()));
-        for(let i=0;i<2;i++){
-          const sh=new T.Shape();sh.moveTo(start,0);sh.bezierCurveTo(R*.4,-R*.09,R*.88,-R*.14,R,0);sh.bezierCurveTo(R*.86,R*.07,R*.5,R*.12,start,R*.025);sh.closePath();
-          const geo=new T.ExtrudeGeometry(sh,{depth:H*.4,bevelEnabled:false,curveSegments:18});geo.rotateX(-Math.PI/2);geo.rotateX((p.id==='propeller_cw'?1:-1)*.2);geo.rotateY(i*Math.PI);geo.translate(0,H*.3,0);g.add(new T.Mesh(geo,propMat()));
+        for(let i=0;i<(triple?3:2);i++){
+          const sh=new T.Shape();sh.moveTo(start,0);sh.bezierCurveTo(R*.37,-R*.12,R*.78,-R*.24,R*.99,-R*.09);sh.bezierCurveTo(R,R*.03,R*.52,R*.14,start,R*.06);sh.closePath();
+          const geo=new T.ExtrudeGeometry(sh,{depth:H*.27,bevelEnabled:false,curveSegments:16});
+          // A spanwise pitch warp keeps the swept blade inside its radius and
+          // mirrors CW/CCW geometry rather than merely relabelling the mesh.
+          const coords=geo.attributes.position;
+          for(let n=0;n<coords.count;n++){const x=coords.getX(n),y=coords.getY(n),z=coords.getZ(n);coords.setXYZ(n,x,y*hand,z+H*.35+hand*y*(.32-.2*x/R));}
+          if(hand<0)for(let n=0;n<coords.count;n+=3){const x=coords.getX(n+1),y=coords.getY(n+1),z=coords.getZ(n+1);coords.setXYZ(n+1,coords.getX(n+2),coords.getY(n+2),coords.getZ(n+2));coords.setXYZ(n+2,x,y,z);}
+          geo.rotateX(-Math.PI/2);geo.rotateY(i*Math.PI*2/(triple?3:2));geo.computeVertexNormals();g.add(new T.Mesh(geo,propMat()));
         }
         return g;
       }
       case 'battery_pack': {
         const W=d.width*s,H=d.height*s,D=d.depth*s;
-        return grp(box(W,H,D,0,H/2,0,0x384e47),box(W*.9,H*.025,D*.66,0,H*1.013,0,0xb5bd8b),box(W*.12,H*.3,D*.06,W*.3,H*.65,-D*.53,0xdfb941));
+        const g=grp(bevelBox(W,H,D,0,H/2,0,0x26343e),bevelBox(W*.98,H*.9,D*.04,0,H/2,-D*.48,0x111b22),bevelBox(W*.98,H*.9,D*.04,0,H/2,D*.48,0x111b22),box(W*.82,H*.012,D*.38,0,H*1.006,0,0xdde5e2));
+        // Geometry-based label bars survive offline rendering; no font/CDN.
+        g.add(box(W*.7,H*.016,D*.035,0,H*1.02,-D*.12,0xe88543));
+        for(let i=0;i<4;i++)g.add(box(W*(.48-i*.07),H*.016,D*.012,-W*.1,H*1.02,D*(-.04+i*.045),0x273843));
+        for(const side of [-1,1])for(let i=0;i<3;i++)g.add(box(W*.012,H*.74,D*.006,side*W*.502,H/2,(i-1)*D*.25,0x53616b));
+        return g;
       }
       case 'battery_strap': {
         const W=d.width*s,H=d.height*s,D=d.depth*s,t=d.wallThickness*s;
-        return grp(box(W,t,D,0,t/2,0),box(W,t,D,0,H-t/2,0),box(t,H,D,-W/2+t/2,H/2,0),box(t,H,D,W/2-t/2,H/2,0),box(W*.35,t*2,D*1.15,W*.2,H+t,0,0x8b9c78));
+        const g=grp(box(W,t,D,0,t/2,0),box(W,t,D,0,H-t/2,0),box(t,H,D,-W/2+t/2,H/2,0),box(t,H,D,W/2-t/2,H/2,0),bevelBox(W*.25,t*2,D*1.1,W*.3,H+t,0,0x71818c));
+        g.add(box(W*.32,t*.2,D*.5,-W*.15,H+t*.1,0,0xee8645));return g;
+      }
+      case 'fpv_camera': {
+        const W=d.width*s,H=d.height*s,D=d.depth*s,R=Math.min(W,H)*.34;
+        const g=grp(bevelBox(W,H,D*.65,0,H/2,D*.175,0x25323e));
+        const lens=grp(cyl(R,D*.23,32,0,0,0,0x1a2632),ring(R*1.1,R*.8,D*.06,mat(0x778b98)),cyl(R*.77,D*.012,32,0,D*.035,0,0x123f59),cyl(R*.45,D*.014,32,0,D*.044,0,0x145977));
+        lens.rotation.x=-Math.PI/2;lens.position.set(0,H/2,-D*.385);g.add(lens);
+        for(const side of [-1,1]){g.add(box(W*.13,H*.38,D*.38,side*W*.5,H*.5,0,0x151e28));for(let n=0;n<3;n++)g.add(box(W*.025,H*.035,D*.35,side*W*.57,H*(.4+n*.1),D*.12,0x657581));}
+        return g;
+      }
+      case 'camera_mount': {
+        const W=d.width*s,H=d.height*s,D=d.depth*s,t=d.wallThickness*s;
+        const g=grp(bevelBox(W,t,D,0,t/2,0,0xe87c3c));
+        for(const side of [-1,1]){g.add(bevelBox(t,H,D*.8,side*(W-t)/2,H/2,0,0xe87c3c));g.add(box(t*.1,H*.5,D*.32,side*(W/2+.005),H*.5,D*.12,0x313e49));}
+        return g;
+      }
+      case 'drone_antenna': {
+        const R=d.diameter*s/2,L=d.length*s;
+        return grp(cyl(R*.62,L*.12,16,0,L*.06,0,0xc89c51),cyl(R*.22,L*.8,12,0,L*.48,0,0x222f3a),cyl(R,L*.16,24,0,L*.92,0,0x293843),cyl(R*1.02,L*.035,24,0,L*.865,0,0xf18a48));
+      }
+      case 'motor_harness':
+      case 'battery_lead': {
+        const L=d.length*s,H=d.height*s,r=d.diameter*s/2,g=grp(),power=p.id==='battery_lead',count=power?2:3;
+        for(let n=0;n<count;n++){const x=(n-(count-1)/2)*r*2.25;g.add(cable([[x,0,0],[x,H*(power?-.15:.2),L*.25],[x,H*(power?-.85:.25),L*.75],[x,power?-H:H,L]],r,power?(n?0x1a2631:0xd75345):[0x26333e,0x4b5962,0xd58142][n]));}return g;
+      }
+      case 'power_connector': {
+        const W=d.width*s,H=d.height*s,D=d.depth*s,g=grp(bevelBox(W,H,D,0,H/2,0,0xe5ad43));
+        for(const side of [-1,1]){const pin=ring(H*.24,H*.15,D*.36,mat(0xb68a43));pin.rotation.x=Math.PI/2;pin.position.set(side*W*.25,H*.5,D*.5);g.add(pin);}return g;
+      }
+      case 'arm_bumper': {
+        const R=d.diameter*s/2,H=d.height*s,t=d.thickness*s,g=grp(ring(R,R-t,t,mat(0xe68140)));
+        for(const side of [-1,1])g.add(bevelBox(t,H,R*.5,side*(R-t/2),H*.5,0,0xe68140));return g;
       }
       case 'flight_controller':
       case 'esc_board': {
@@ -340,7 +413,7 @@
     return `
 ${assemblyGuide()}<div class="editor3d" id="editor3d" data-mobile-panel="parts">
 
-  <div class="workbenchHeader"><div class="workbenchIdentity"><span class="workbenchMark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m12 2 9 5v10l-9 5-9-5V7l9-5Zm0 10L3 7m9 5 9-5m-9 5v10"/></svg></span><div><span class="workbenchEyebrow">3D DESIGN STUDIO</span><strong>${esc(current.name)}</strong></div><span class="workbenchStorage">${studioBackend.enabled?'Connected account':'Local device'}</span></div><div class="workbenchHeaderActions"><button id="findWorkbenchTool" title="Find a 3D tool (Ctrl or Command + /)"><span aria-hidden="true">⌕</span> Find a tool <kbd>Ctrl /</kbd></button><button id="workbenchHelp" aria-label="Workspace controls and help">?</button><button id="focusWorkbench" title="Expand or restore workspace">⤢ <span>Expand</span></button></div></div>
+  <div class="workbenchHeader"><div class="workbenchIdentity"><span class="workbenchMark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m12 2 9 5v10l-9 5-9-5V7l9-5Zm0 10L3 7m9 5 9-5m-9 5v10"/></svg></span><div><span class="workbenchEyebrow">3D DESIGN STUDIO</span><strong>${esc(current.name)}</strong></div><span class="workbenchStorage">${studioBackend.enabled?'Connected account':'Local device'}</span></div><div class="workbenchHeaderActions"><button id="findWorkbenchTool" title="Find a 3D tool (Ctrl or Command + /)"><span aria-hidden="true">⌕</span> Find a tool <kbd>Ctrl /</kbd></button><button id="workbenchHelp" aria-label="Workspace controls and help">?</button><button id="presentWorkbench" aria-pressed="false" title="Show the model with editing panels hidden">◇ <span>Present</span></button><button id="focusWorkbench" title="Expand or restore workspace">⤢ <span>Expand</span></button></div></div>
   <!-- Tools stay visible in named groups; the finder also reaches advanced tools. -->
   <div class="editor3d-toolbar">
     <div class="workbenchToolGroup" role="group" aria-label="Project directions"><span class="tb-label">EXPLORE</span><div><a id="openProjectTypes" class="projectTypesEntry" href="#/project-types">Project types ↗</a></div></div>
@@ -545,7 +618,7 @@ ${assemblyGuide()}<div class="editor3d" id="editor3d" data-mobile-panel="parts">
 
   /* ─── Scene Initialization ───────────────────────────────────── */
   function initScene() {
-    if(renderer){controls?.dispose();transformControls?.dispose();renderer.dispose();vpObserver?.disconnect();}
+    if(renderer){controls?.dispose();transformControls?.dispose();environmentTarget?.dispose();environmentTarget=null;renderer.dispose();vpObserver?.disconnect();}
     renderer=null;controls=null;clearSceneObjectsSafe();
     const T = window.THREE;
     const vp = document.getElementById('vp3d');
@@ -565,6 +638,8 @@ ${assemblyGuide()}<div class="editor3d" id="editor3d" data-mobile-panel="parts">
 
     scene = new T.Scene();
     scene.fog = new T.Fog(0x1c282f, 90, 220);
+    const room=new T.RoomEnvironment(),pmrem=new T.PMREMGenerator(renderer);
+    try{environmentTarget=pmrem.fromScene(room,.04);scene.environment=environmentTarget.texture;}finally{room.dispose();pmrem.dispose();}
 
     camera = new T.PerspectiveCamera(45, W / H, 0.01, 100000);
     camera.position.set(8, 6, 10);
@@ -577,6 +652,7 @@ ${assemblyGuide()}<div class="editor3d" id="editor3d" data-mobile-panel="parts">
     sun.position.set(12, 22, 12);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.normalBias=.015;sun.shadow.bias=-.00015;
     ['left', 'right', 'top', 'bottom'].forEach((k, i) => { sun.shadow.camera[k] = [-20, 20, 20, -20][i]; });
     scene.add(sun);
 
@@ -591,7 +667,7 @@ ${assemblyGuide()}<div class="editor3d" id="editor3d" data-mobile-panel="parts">
 
     const ground = new T.Mesh(
       new T.PlaneGeometry(2000, 2000),
-      new T.MeshStandardMaterial({ color: 0x293b45, roughness: 1.0, metalness: 0.0 })
+      new T.MeshStandardMaterial({ color: 0x293b45, roughness: 1.0, metalness: 0.0, envMapIntensity:0 })
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.01;
@@ -702,7 +778,7 @@ ${assemblyGuide()}<div class="editor3d" id="editor3d" data-mobile-panel="parts">
   function focusSelected(){if(!selectedIds.size)return _toast('Click a part to focus it.');const bounds=new window.THREE.Box3();objects.filter(o=>selectedIds.has(o.id)).forEach(o=>{if(o.visible)o.obj3d.visible=true;bounds.union(new window.THREE.Box3().setFromObject(o.obj3d));});frameBounds(bounds);hint('Focused on '+(selectedIds.size===1?objects.find(o=>selectedIds.has(o.id))?.name:selectedIds.size+' parts')+'. Wheel or pinch to zoom.');}
   function isolateSelected(){if(!selectedIds.size)return _toast('Select a part or group to isolate.');stopAttachment(false);assembledView();isolationIds=new Set(selectedIds);objects.forEach(o=>o.obj3d.visible=o.visible&&isolationIds.has(o.id));focusSelected();hint('Only your selection is shown. Show all restores the assembly; exports still use saved visibility.');}
   function showAllParts(){stopAttachment(false);isolationIds=null;assembledView();const changed=objects.some(o=>!o.visible);objects.forEach(o=>{o.visible=true;o.obj3d.visible=true;});if(changed)saveScene();refreshAsm();renderInsp();fitAssembly();hint('All parts are visible. Click a part to customize it.');}
-  function toggleWorkspaceFocus(force){focusMode=typeof force==='boolean'?force:!focusMode;document.body.classList.toggle('studioFocus',focusMode);const exit=document.getElementById('leaveWorkspaceFocus');if(exit)exit.hidden=!focusMode;const button=document.getElementById('focusWorkbench');if(button){button.innerHTML=focusMode?'⤡ <span>Restore</span>':'⤢ <span>Expand</span>';button.setAttribute('aria-pressed',String(focusMode));}requestAnimationFrame(()=>{const vp=document.getElementById('vp3d');if(vp&&renderer&&camera){renderer.setSize(vp.clientWidth,vp.clientHeight,false);camera.aspect=vp.clientWidth/vp.clientHeight;camera.updateProjectionMatrix();if(focusMode&&!attachment&&objects.length){const bounds=new window.THREE.Box3();objects.filter(o=>o.obj3d.visible).forEach(o=>bounds.union(new window.THREE.Box3().setFromObject(o.obj3d)));frameBounds(bounds);}}});}
+  function toggleWorkspaceFocus(force){if(force===false&&presentationMode){presentationMode=false;document.getElementById('editor3d')?.classList.remove('isPresentation');const present=document.getElementById('presentWorkbench');if(present){present.innerHTML='◇ <span>Present</span>';present.setAttribute('aria-pressed','false');}}focusMode=typeof force==='boolean'?force:!focusMode;document.body.classList.toggle('studioFocus',focusMode);const exit=document.getElementById('leaveWorkspaceFocus');if(exit)exit.hidden=!focusMode;const button=document.getElementById('focusWorkbench');if(button){button.innerHTML=focusMode?'⤡ <span>Restore</span>':'⤢ <span>Expand</span>';button.setAttribute('aria-pressed',String(focusMode));}requestAnimationFrame(()=>{const vp=document.getElementById('vp3d');if(vp&&renderer&&camera){renderer.setSize(vp.clientWidth,vp.clientHeight,false);camera.aspect=vp.clientWidth/vp.clientHeight;camera.updateProjectionMatrix();if(focusMode&&!attachment&&objects.length){const bounds=new window.THREE.Box3();objects.filter(o=>o.obj3d.visible).forEach(o=>bounds.union(new window.THREE.Box3().setFromObject(o.obj3d)));frameBounds(bounds);}}});}
   function detachSelected(){try{stopAttachment(false);const data=sceneData(),ids=new Set(selectedIds),removed=(data.joints||[]).filter(j=>ids.has(j.child)&&!ids.has(j.parent));if(!removed.length)throw Error('The selected parts have no incoming attachment to detach.');data.joints=data.joints.filter(j=>!removed.includes(j));commitAssembly(data,[...ids]);hint('Detached. You can drag this part or attach it to another face.');}catch(e){_toast(e.message);}}
   function surfacePick(event,excluded=new Set()){
     if(!raycaster||!camera)return null;const canvas=document.getElementById('v3dCanvas'),rect=canvas?.getBoundingClientRect();if(!rect?.width||event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)return null;raycaster.setFromCamera({x:(event.clientX-rect.left)/rect.width*2-1,y:-(event.clientY-rect.top)/rect.height*2+1},camera);
@@ -713,6 +789,13 @@ ${assemblyGuide()}<div class="editor3d" id="editor3d" data-mobile-panel="parts">
   }
   function attachmentOptions(){return {gapMm:Number(document.getElementById('attachmentGap')?.value||0),spinDegrees:Number(document.getElementById('attachmentSpin')?.value||0),align:document.getElementById('attachmentAlign')?.checked!==false,lock:document.getElementById('attachmentLock')?.checked!==false};}
   function drawAttachmentMarkers(){if(attachmentMarkers){scene.remove(attachmentMarkers);disposeObject(attachmentMarkers);}attachmentMarkers=new window.THREE.Group();scene.add(attachmentMarkers);const T=window.THREE;for(const [pick,color] of [[attachment?.source,0xf3ca77],[attachment?.target,0x88d3ff]]){if(!pick)continue;const point=new T.Vector3(...(document.getElementById('attachmentCentres').checked&&pick.id?faceCentre(pick):pick.point)).multiplyScalar(.1),end=point.clone().addScaledVector(new T.Vector3(...pick.normal),1.2),line=new T.Line(new T.BufferGeometry().setFromPoints([point,end]),new T.LineBasicMaterial({color,depthTest:false})),dot=new T.Mesh(new T.SphereGeometry(.075,12,8),new T.MeshBasicMaterial({color,depthTest:false}));dot.position.copy(point);line.renderOrder=dot.renderOrder=100;attachmentMarkers.add(line,dot);}}
+  function togglePresentation(){
+    const root=document.getElementById('editor3d');if(!root)return;
+    if(!presentationMode){presentationWasFocused=focusMode;stopAttachment(false);select(null);setMode('orbit');presentationMode=true;root.classList.add('isPresentation');toggleWorkspaceFocus(true);}
+    else{presentationMode=false;root.classList.remove('isPresentation');toggleWorkspaceFocus(presentationWasFocused);}
+    const button=document.getElementById('presentWorkbench');button.innerHTML=presentationMode?'↩ <span>Back to editing</span>':'◇ <span>Present</span>';button.setAttribute('aria-pressed',String(presentationMode));
+    requestAnimationFrame(()=>fitAssembly());
+  }
   function clearAttachmentGhost(){if(attachmentGhost){scene?.remove(attachmentGhost);attachmentGhost.traverse(o=>{if(o.isMesh)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose());});attachmentGhost=null;}attachmentGhosts.clear();if(attachmentMarkers){scene?.remove(attachmentMarkers);disposeObject(attachmentMarkers);attachmentMarkers=null;}}
   function stopAttachment(message=true){if(!attachment&&!attachmentGhost)return;const old=attachment;attachment=null;clearAttachmentGhost();for(const [id,visible] of old?.originalVisibility||[])objects.find(o=>o.id===id)?.obj3d&&(objects.find(o=>o.id===id).obj3d.visible=visible);const options=document.getElementById('attachmentOptions');if(options)options.hidden=true;document.getElementById('attachFaces')?.classList.remove('active');document.getElementById('dragSnap')?.classList.remove('active');if(mode==='attach-drag')setMode('orbit');if(message)hint('Attachment cancelled. Your original assembly is unchanged.');}
   function beginAttachment(kind){try{stopAttachment(false);facePicking=false;measureMode=false;assembledView();if(objects.filter(o=>o.visible).length<2&&kind==='faces')throw Error('Add two parts first. Preview & size helps you customize each one.');attachment={kind,phase:'source',projectId:current.id,before:null,source:null,target:null,movingIds:[],draft:null,originalVisibility:new Map()};document.getElementById('attachmentOptions').hidden=false;document.getElementById('applyAttachment').disabled=true;document.getElementById(kind==='drag'?'dragSnap':'attachFaces').classList.add('active');setMode(kind==='drag'?'attach-drag':'orbit');hint(kind==='drag'?'Drag a part onto another surface. Its bottom snaps to that surface. Drop on empty space to move freely.':'Step 1 of 3 · Click the face of the part you want to move.');}catch(e){_toast(e.message);}}
@@ -794,7 +877,8 @@ ${assemblyGuide()}<div class="editor3d" id="editor3d" data-mobile-panel="parts">
     document.getElementById('findWorkbenchTool').onclick=findWorkbenchTool;
     document.getElementById('workbenchHelp').onclick=workbenchHelp;
     document.getElementById('workbenchShortcuts').onclick=workbenchHelp;
-    document.getElementById('focusWorkbench').onclick=()=>toggleWorkspaceFocus();
+    document.getElementById('focusWorkbench').onclick=()=>presentationMode?togglePresentation():toggleWorkspaceFocus();
+    document.getElementById('presentWorkbench').onclick=togglePresentation;
     document.getElementById('focusWorkbench').setAttribute('aria-pressed',String(focusMode));
     for(const id of ['jumpCustomize','jumpAssembly']){const button=document.getElementById(id),action=button.onclick;button.setAttribute('aria-pressed',String(id==='jumpCustomize'));button.onclick=()=>{document.getElementById('editor3d').dataset.mobilePanel='edit';reflectMobilePanel();action?.();for(const other of ['jumpCustomize','jumpAssembly'])document.getElementById(other).setAttribute('aria-pressed',String(id===other));};}
     const root=document.getElementById('editor3d');
@@ -1010,14 +1094,10 @@ ${assemblyGuide()}<div class="editor3d" id="editor3d" data-mobile-panel="parts">
 
 
     document.querySelectorAll('[data-mat]').forEach(btn => {
-      btn.onclick = () => {
-        rec.def.mat = btn.dataset.mat;
-        const col = MAT_COLORS[btn.dataset.mat] || rec.def.col;
-        rec.def.col = col;
-        rec.obj3d.traverse(c => { if (c.isMesh && c.material?.color) {c.material.color.setHex(col);c.material.metalness=['Steel','Brass','Aluminium 6061','Aluminium / Steel'].includes(rec.def.mat)?0.7:0.05;c.material.roughness=rec.def.mat==='ABS polymer'?0.7:0.36;} });
-        document.querySelectorAll('[data-mat]').forEach(b => b.classList.toggle('active', b === btn));
-        refreshBom();
-        saveScene();
+      btn.onclick = async () => {
+        const project=current.id,nextDef={...rec.def,mat:btn.dataset.mat,col:MAT_COLORS[btn.dataset.mat]};let replacement;
+        try{if(nextDef.model)await StudioSolidModel.prepare(nextDef.model,nextDef.dims.depth);if(current.id!==project||!objects.includes(rec)||!isActive())return;replacement=build(nextDef);}catch(error){_toast(error.message);return;}
+        assembledView();replacement.position.copy(rec.obj3d.position);replacement.rotation.copy(rec.obj3d.rotation);scene.remove(rec.obj3d);disposeObject(rec.obj3d);rec.def=nextDef;rec.obj3d=replacement;applyRecordAppearance(rec);scene.add(replacement);select(rec.id);refreshBom();saveScene();
       };
     });
 
@@ -1256,8 +1336,9 @@ ${assemblyGuide()}<div class="editor3d" id="editor3d" data-mobile-panel="parts">
     if(!camera||!controls||!objects.some(o=>o.obj3d.visible))return;
     const T=window.THREE,bounds=new T.Box3();objects.filter(o=>o.obj3d.visible).forEach(o=>{o.obj3d.updateMatrixWorld(true);bounds.union(new T.Box3().setFromObject(o.obj3d));});
     const center=bounds.getCenter(new T.Vector3()),size=bounds.getSize(new T.Vector3());
-    const distance=Math.max(.5,Math.max(size.x,size.y,size.z)/(2*Math.tan(camera.fov*Math.PI/360))*1.6/Math.min(1,camera.aspect));
-    const direction=view==='top'?new T.Vector3(0,1,.001):view==='front'?new T.Vector3(0,0,1):new T.Vector3(.7,.65,.7);
+    const drone=objects.some(o=>o.def.id==='fpv_camera');
+    const distance=Math.max(.5,Math.max(size.x,size.y,size.z)/(2*Math.tan(camera.fov*Math.PI/360))*(drone?1.4:1.6)/Math.min(1,camera.aspect));
+    const direction=view==='top'?new T.Vector3(0,1,.001):view==='front'?new T.Vector3(0,0,1):drone?new T.Vector3(.8,.8,-1):new T.Vector3(.7,.65,.7);
     controls.target.copy(center);camera.position.copy(center).addScaledVector(direction.normalize(),distance);if(scene.fog){scene.fog.near=Math.max(90,distance*2);scene.fog.far=Math.max(220,distance*6);}controls.update();
   }
 

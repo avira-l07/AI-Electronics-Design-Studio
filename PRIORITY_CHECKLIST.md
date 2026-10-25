@@ -1,5 +1,9 @@
 # Engineering Studio — current delivery checklist
 
+Current v15.7: [FPV showcase drone](V15_7_DRONE_SHOWCASE.md). Adds a 136-component editable drone with three-blade propellers, camera, antennas, routed cable envelopes and coordinated finishes; a 41-part library; and a presentation view. Material reload consistency and circular export triangles are fixed. New starters preserve existing projects. No new Premium rules or paid services. Verification: 187 API tests; 144 browser checks with two expected skips; four final targeted drone checks; all 12 JavaScript suites; 53 public assets.
+
+Business expansion ideas and the pilot experiment are tracked separately in the [project bucket list](PROJECT_BUCKET_LIST.md). This delivery checklist continues to distinguish completed work from outstanding implementation and acceptance.
+
 Latest v15.6: [3D project-type options](V15_6_PROJECT_OPTIONS.md). Twelve illustrated, searchable directions are available, with manual-editor navigation and project preservation. Category-specific generation and future Free/Premium assignments remain pending owner input. 140 browser checks passed with two expected skips; all 12 JavaScript suites and the 51-asset guard passed. Existing backend activation and CAD acceptance work below remain outstanding.
 
 Latest v15.5: [submitted security audit](api/SECURITY_AUDIT_2026-10-25.md). Confirmed gaps fixed: pre-database snapshot limits, persistent rolling recipient quotas, export validation, background manufacturing review, replay alerts and Stripe schema/version drift. 186 API tests and 132 desktop/phone browser checks passed, with two expected browser skips; all 12 JavaScript suites and the 49-asset guard passed. Backend source fixes are not live until deployment. No paid services were activated.

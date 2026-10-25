@@ -36,6 +36,7 @@ def validate_assembly(a):
         if 'boreDiameter' in d and d['boreDiameter']>=d['diameter']:invalid()
         if 'headDiameter' in d and d['headDiameter']<=d['diameter']:invalid()
         if 'acrossFlats' in d and d['acrossFlats']<=d['diameter']:invalid()
+        if o['partId']=='arm_bumper' and d['thickness']>=min(d['diameter']/2,d['height']):invalid()
         if 'flangeDiameter' in d and d['flangeDiameter']<d['outerDiameter']:invalid()
         for key,limit in [('position',100000),('rotation',3600)]:
             if not isinstance(o[key],list) or len(o[key])!=3 or any(not number(v,limit) for v in o[key]):invalid()

@@ -14,8 +14,8 @@ process.stdout.write(vm.runInContext('JSON.stringify(StudioDrone.projectData())'
 """
     data=json.loads(subprocess.check_output(['node','-e',script],cwd=root,text=True))
     data.update(name='Quadcopter assembly',material='Steel',stroke=80,rod=150,rpm=600,notes=[],revisions=[])
-    assert len(data['assembly3d']['objects'])==120
-    assert sum(row['qty'] for row in data['parts'])==120
+    assert len(data['assembly3d']['objects'])==136
+    assert sum(row['qty'] for row in data['parts'])==136
     assert json.loads(project_data(data))['assembly3d']==data['assembly3d']
     app,c,g,s=env;verified_user(app);login(c)
     response=post(c,'/api/projects',data)
@@ -23,3 +23,15 @@ process.stdout.write(vm.runInContext('JSON.stringify(StudioDrone.projectData())'
     saved=c.get('/api/projects').json()[0]
     assert saved['assembly3d']==data['assembly3d']
     assert saved['parts']==data['parts']
+
+def test_bumper_rejects_impossible_walls():
+    import pytest
+    from fastapi import HTTPException
+    from api.assembly_data import validate_assembly
+    item=dict(id='bumper',partId='arm_bumper',name='Bumper',dims=dict(diameter=33,height=12,thickness=2),material='ABS polymer',position=[0,0,0],rotation=[0,0,0],visible=True,wireframe=False)
+    assembly=dict(version=1,units='mm',objects=[item])
+    validate_assembly(assembly)
+    for thickness in [12,17]:
+        item['dims']['thickness']=thickness
+        with pytest.raises(HTTPException) as error:validate_assembly(assembly)
+        assert error.value.status_code==422

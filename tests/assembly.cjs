@@ -7,6 +7,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
  vm.runInContext(fs.readFileSync('dist/solid-model.js','utf8'),ctx);
  const {default:Module}=await import(pathToFileURL(path.resolve('dist/vendor/manifold/manifold.js')).href);const kernel=await Module();kernel.setup();ctx.kernel=kernel;vm.runInContext('StudioSolidModel.setKernel(kernel)',ctx);
  vm.runInContext(fs.readFileSync('dist/assembly-data.js','utf8'),ctx);
+ vm.runInContext(fs.readFileSync('dist/manufacturing.js','utf8'),ctx);
  vm.runInContext(fs.readFileSync('dist/drone-template.js','utf8'),ctx);
  vm.runInContext(fs.readFileSync('dist/project-format.js','utf8'),ctx);
  const src=fs.readFileSync('dist/studio-3d.js','utf8');
@@ -14,11 +15,19 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
  const model=vm.runInContext('StudioAssembly',ctx),engine=ctx.engine;
  engine.setup();engine.loadScene();
  function rec(partId,id='item'){const p=structuredClone(model.parts.find(p=>p.id===partId));return{id,name:p.name,def:p,obj3d:engine.build(p),visible:true,wireframe:false}}
- assert.equal(model.parts.length,32);assert.deepEqual(JSON.parse(JSON.stringify({materials:model.materials,parts:Object.fromEntries(model.parts.map(p=>[p.id,p.dims]))})),JSON.parse(fs.readFileSync('api/assembly_schema.json','utf8')));
+ assert.equal(model.parts.length,41);assert.deepEqual(JSON.parse(JSON.stringify({materials:model.materials,parts:Object.fromEntries(model.parts.map(p=>[p.id,p.dims]))})),JSON.parse(fs.readFileSync('api/assembly_schema.json','utf8')));
  for(const p of model.parts){assert.equal(model.dimensions(p.id,p.dims),true,p.id);const mesh=engine.build(p);mesh.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(mesh);assert.ok(Number.isFinite(box.max.x)&&!box.isEmpty(),p.id);mesh.traverse(c=>{if(c.isMesh){const coords=c.geometry.attributes.position;for(let i=0;i<coords.count;i++)assert.ok(Number.isFinite(coords.getX(i))&&Number.isFinite(coords.getY(i))&&Number.isFinite(coords.getZ(i)),p.id)}});}
  assert.equal(model.dimensions('gear_spur',{diameter:40,thickness:10,teeth:100000}),false);
+ // New showcase meshes must export closed, outward-facing component surfaces,
+ // including mirrored propeller blades and the caps of curved cable tubes.
+ const inspect=vm.runInContext('StudioManufacturing.inspect',ctx);
+ for(const id of ['propeller_tri_cw','propeller_tri_ccw','fpv_camera','camera_mount','drone_antenna','motor_harness','battery_lead','power_connector','arm_bumper']){
+   const root=engine.build(model.parts.find(p=>p.id===id));root.updateMatrixWorld(true);
+   root.traverse(mesh=>{if(!mesh.isMesh)return;const geo=mesh.geometry,p=geo.attributes.position,idx=geo.index,positions=[];assert.equal(geo.attributes.normal.count,p.count,id+' has a normal for each vertex');for(let n=0;n<(idx?idx.count:p.count);n++){const i=idx?idx.getX(n):n,v=new THREE.Vector3(p.getX(i),p.getY(i),p.getZ(i)).applyMatrix4(mesh.matrixWorld).multiplyScalar(10);positions.push(v.x,v.y,v.z);}const result=inspect(positions);assert.ok(result.closed,id+' has closed submeshes '+JSON.stringify(result));assert.equal(result.globallyReversed,false,id+' has outward winding');});
+ }
  assert.equal(model.dimensions('bearing_ball',{outerDiameter:52,innerDiameter:60,width:15}),false);
- for(const id of ['pulley','flange_coupler','bearing_ball','bearing_flange','linear_bush','nut_hex','gear_spur','washer','propeller_cw','propeller_ccw']){const r=rec(id);r.obj3d.updateMatrixWorld(true);const hits=new THREE.Raycaster(new THREE.Vector3(0,1000,0),new THREE.Vector3(0,-1,0)).intersectObject(r.obj3d,true);assert.equal(hits.length,0,id+' has a real central opening');}
+ assert.equal(model.dimensions('arm_bumper',{diameter:33,height:12,thickness:17}),false);assert.equal(model.dimensions('arm_bumper',{diameter:33,height:12,thickness:12}),false);
+ for(const id of ['pulley','flange_coupler','bearing_ball','bearing_flange','linear_bush','nut_hex','gear_spur','washer','propeller_cw','propeller_ccw','propeller_tri_cw','propeller_tri_ccw']){const r=rec(id);r.obj3d.updateMatrixWorld(true);const hits=new THREE.Raycaster(new THREE.Vector3(0,1000,0),new THREE.Vector3(0,-1,0)).intersectObject(r.obj3d,true);assert.equal(hits.length,0,id+' has a real central opening');}
  const plate=rec('plate_flat');plate.obj3d.position.set(2,1,3);engine.setObjects([plate]);assert.equal(engine.sceneData().objects[0].position.join(','),'20,10,30');engine.saveScene();assert.equal(snapshots.length,1);assert.equal(snapshots[0].assembly3d.objects.length,1);
  engine.exportSTL();const stl=downloads.at(-1).text;assert.ok(stl.startsWith('solid assembly_mm_z_up'));const vertices=[...stl.matchAll(/vertex ([^ ]+) ([^ ]+) ([^\n]+)/g)].map(m=>m.slice(1).map(Number));const extent=axis=>Math.max(...vertices.map(v=>v[axis]))-Math.min(...vertices.map(v=>v[axis]));assert.ok(Math.abs(extent(0)-80)<1e-4);assert.ok(Math.abs(extent(1)-60)<1e-4);assert.ok(Math.abs(extent(2)-3)<1e-4);assert.ok(Math.abs(Math.min(...vertices.map(v=>v[2]))-10)<1e-4,'placement and local thickness offsets are retained');
  engine.exportOBJ();assert.ok(downloads.at(-1).text.includes('units mm; Z up'));assert.ok(!/v (NaN|Infinity)/.test(downloads.at(-1).text));
@@ -34,11 +43,12 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
  const canonical={id:'export',name:'Assembly',material:'Steel',stroke:80,rod:150,rpm:600,parts:[],notes:[],revisions:[],assembly3d:legacy};ctx.candidate=canonical;assert.equal(vm.runInContext('StudioProjectData.validate(candidate)',ctx),true);canonical.revisions=[{label:'Saved',date:'today',snapshot:{...structuredClone(canonical),revisions:[]}}];assert.equal(vm.runInContext('StudioProjectData.validate(candidate)',ctx),true);
  ctx.current={id:'placement',parts:[]};engine.loadScene();engine.place('plate_flat');engine.place('motor_nema17');const inserted=engine.get().objects.map(o=>new THREE.Box3().setFromObject(o.obj3d));assert.equal(inserted[0].intersectsBox(inserted[1]),false,'new library parts do not initially overlap');
  vm.runInContext("studioStorage.read=()=>\"{broken\"",ctx);ctx.current={id:'broken',parts:[]};assert.throws(()=>engine.loadScene());vm.runInContext('studioStorage.read=()=>null',ctx);
- const drone=vm.runInContext('StudioDrone.assembly()',ctx);assert.equal(drone.objects.length,120);assert.ok(model.validate(drone));
+ const drone=vm.runInContext('StudioDrone.assembly()',ctx);assert.equal(drone.objects.length,136);assert.ok(model.validate(drone));
  ctx.current={...canonical,id:'drone',revisions:[],assembly3d:drone};engine.loadScene();
  const canonicalDrone=JSON.stringify(engine.sceneData());
  const motors=drone.objects.filter(o=>o.partId==='motor_brushless'),props=drone.objects.filter(o=>o.partId.startsWith('propeller_'));
- assert.equal(motors.length,4);assert.equal(props.filter(o=>o.partId==='propeller_cw').length,2);assert.equal(props.filter(o=>o.partId==='propeller_ccw').length,2);
+ assert.equal(motors.length,4);assert.equal(props.filter(o=>o.partId==='propeller_tri_cw').length,2);assert.equal(props.filter(o=>o.partId==='propeller_tri_ccw').length,2);
+ assert.equal(drone.objects.filter(o=>o.partId==='fpv_camera').length,1);assert.equal(drone.objects.filter(o=>o.partId==='drone_antenna').length,2);assert.equal(drone.objects.filter(o=>o.partId==='motor_harness').length,4);assert.equal(drone.objects.filter(o=>o.partId==='arm_bumper').length,4);
  for(let i=0;i<props.length;i++)for(let j=i+1;j<props.length;j++)assert.ok(Math.hypot(props[i].position[0]-props[j].position[0],props[i].position[2]-props[j].position[2])>127,'propeller envelopes do not intersect');
  // Each motor mounting screw must align with an actual arm opening.
  for(const arm of engine.get().objects.filter(o=>o.def.id==='quad_arm')){
@@ -46,8 +56,8 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
    for(const screw of screws){const [x,,z]=screw.position;assert.equal(new THREE.Raycaster(new THREE.Vector3(x/10,100,z/10),new THREE.Vector3(0,-1,0)).intersectObject(arm.obj3d,true).length,0,label+' motor holes match screws');}
  }
  let count=0;for(let step=1;step<=6;step++){engine.setAssemblyStage(step);const shown=engine.get().objects.filter(o=>o.obj3d.visible).length;assert.ok(shown>=count);count=shown;assert.equal(JSON.stringify(engine.sceneData()),canonicalDrone,'preview must not alter saved geometry/visibility');}
- assert.equal(count,120);engine.setAssemblyStage(1);engine.toggleExplode();assert.equal(JSON.stringify(engine.sceneData()),canonicalDrone);engine.exportOBJ();assert.equal(engine.get().objects.filter(o=>o.obj3d.visible).length,120,'exports restore full assembly');assert.equal(downloads.at(-1).text.split('\no ').length-1,120);
- engine.syncBOM();assert.equal(ctx.current.parts.reduce((sum,p)=>sum+p.qty,0),120);const saved=JSON.stringify(ctx.current);engine.syncBOM();assert.equal(JSON.stringify(ctx.current),saved,'drone BOM resync preserves quantities');
+ assert.equal(count,136);engine.setAssemblyStage(1);engine.toggleExplode();assert.equal(JSON.stringify(engine.sceneData()),canonicalDrone);engine.exportOBJ();assert.equal(engine.get().objects.filter(o=>o.obj3d.visible).length,136,'exports restore full assembly');assert.equal(downloads.at(-1).text.split('\no ').length-1,136);
+ engine.syncBOM();assert.equal(ctx.current.parts.reduce((sum,p)=>sum+p.qty,0),136);const saved=JSON.stringify(ctx.current);engine.syncBOM();assert.equal(JSON.stringify(ctx.current),saved,'drone BOM resync preserves quantities');
  const custom=vm.runInContext('StudioSolidModel.demoAssembly()',ctx);ctx.current={...canonical,id:'custom',revisions:[],parts:[],assembly3d:custom};engine.loadScene();const recipeCopy=JSON.stringify(engine.sceneData().objects[0].model);engine.select('solid-demo');engine.dupSelected();assert.equal(engine.sceneData().objects.length,2);assert.equal(JSON.stringify(engine.sceneData().objects[1].model),recipeCopy,'duplication retains editable recipes');engine.syncBOM();assert.equal(ctx.current.parts.length,1);assert.equal(ctx.current.parts[0].qty,2);const savedCustom=engine.sceneData();ctx.current={...ctx.current,id:'reloaded-custom',assembly3d:structuredClone(savedCustom)};engine.loadScene();assert.equal(JSON.stringify(engine.sceneData()),JSON.stringify(savedCustom),'recipe and placement round-trip');engine.exportOBJ();assert.equal(downloads.at(-1).text.split('\no ').length-1,2,'handles and helpers are excluded from export');
  if(process.env.STUDIO_EXPORT_FIXTURES==='1'){
   const solid=vm.runInContext('StudioSolidModel',ctx),sketch=vm.runInContext('StudioSketch',ctx),base=solid.defaultModel();
@@ -69,5 +79,5 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
  vm.runInContext('StudioSolidModel',ctx).geometry=()=>{throw Error('Results evicted');};
  ctx.current.assembly3d.objects[0].position=[10,0,0];engine.loadScene();assert.equal(engine.get().objects[0].obj3d.position.x,1);
  vm.runInContext('StudioSolidModel',ctx).prepare=realPrepare;vm.runInContext('StudioSolidModel',ctx).geometry=realGeometry;
- console.log('PASS: 32 finite geometries, 120-part drone, custom-solid persistence/duplication/BOM/export, cache-evicting assembly loading, real bores, millimetres, project isolation, snapshots and editor lifecycle.');
+ console.log('PASS: 41 finite geometries, 136-part FPV drone, custom-solid persistence/duplication/BOM/export, cache-evicting assembly loading, real bores, millimetres, project isolation, snapshots and editor lifecycle.');
 })().catch(error=>{console.error(error);process.exitCode=1});

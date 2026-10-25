@@ -1,5 +1,9 @@
 # AI Engineering Design Studio
 
+Current v15.7: [FPV showcase drone](V15_7_DRONE_SHOWCASE.md). Adds a 136-component editable drone with three-blade propellers, camera, antennas, routed cable envelopes and coordinated finishes; a 41-part library; and a presentation view. Material reload consistency and circular export triangles are fixed. New starters preserve existing projects. No new Premium rules or paid services. Verification: 187 API tests; 144 browser checks with two expected skips; four final targeted drone checks; all 12 JavaScript suites; 53 public assets.
+
+Future business features and the first pilot milestone are saved in the [project bucket list](PROJECT_BUCKET_LIST.md). Premium assignments and prices remain for the owner's later decision.
+
 Current v15.6: [3D project-type options](V15_6_PROJECT_OPTIONS.md). Adds twelve searchable project directions, including engines, ships and LoRa devices, with component descriptions and links to the existing manual workspace. Category-specific generation and new Premium assignments await the owner's decisions. Existing Free/Pro rules and billing remain unchanged. Verification passed: 140 browser checks, two expected skips, all 12 JavaScript suites and the 51-asset guard.
 
 Current v15.5: [verified security audit and fixes](api/SECURITY_AUDIT_2026-10-25.md). Adds anonymous snapshot throttling, rolling recipient invitation limits, defensive exports, background manufacturing review, once-only replay alerts and Stripe schema/version checks. Verification: 186 API tests, 132 browser checks with two expected skips, all 12 JavaScript suites and the 49-asset guard passed. Backend changes require deployment; paid services remain disabled.
